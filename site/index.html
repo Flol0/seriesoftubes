@@ -519,6 +519,7 @@ function portsUsed(c){let u=0;
   for(const x of S.pni)if(x.city===c)u+=PORT_SLOT(x.tier)*(x.n||1);
   for(const x of ixIdsIn(c))if(S.ixp[x]!==undefined&&!S.myIx[x])u+=PORT_SLOT(S.ixp[x])*((S.ixn||{})[x]||1);
   if(S.myIx[c])u+=1;
+  u+=(S.pops[c]?.dc?.racks||0);
   u+=S.caches.filter(x=>x.city===c).length+(S.nni||[]).filter(x=>x.city===c).length;
   return u;}
 function portsMax(c,g,rt){const p=S.pops[c];if(!p)return 0;return RG[g===undefined?(p.rgen||0):g].ports*(rt||p.routers||1);}
@@ -1245,7 +1246,7 @@ function dateStr(d){const y=1+Math.floor(d/360),m=Math.floor(d/30)%12,dd=d%30+1;
 function wrapDx(a,b){let dx=b-a;if(dx>W/2)dx-=W;if(dx<-W/2)dx+=W;return dx;}
 function kmBetween(a,b){const A=CITY[a],B=CITY[b];return Math.max(20,Math.round(hav(A.lon,A.lat,B.lon,B.lat)));}
 const isSub=(a,b)=>CITY[a].land!==CITY[b].land;
-const popUp=c=>S.pops[c]&&!(S.pops[c].down>S.day);
+const popUp=c=>S.pops[c]&&!(S.pops[c].down>S.day)&&powerAvailable(c);
 const regionsCount=()=>new Set(Object.keys(S.pops).map(c=>CITY[c].reg)).size;
 const ixCity=x=>String(x).split('~')[0];
 function ixIdsIn(c){const o=ixStatic(c);if(S&&S.myIx&&S.myIx[c]&&!o.includes(c))o.unshift(c);return o;}
@@ -1440,11 +1441,11 @@ function compute(){
   const viral=(ev.viral>day?1.25:1)*(ev.php&&ev.php>day?0.7:1);
   const flows=[];
   for(const c of Object.keys(S.pops)){
-    const p=S.pops[c],SH=cnCity(c)?NSH_CN:ruCity(c)?NSH_RU:NSH;const eye=(p.bb?p.bb.d:0)*viral*(cnCity(c)&&ev.golden>day?1.4:1);const biz=S.biz.filter(b=>b.city===c&&!BIZ_T[b.type].l2&&!BIZ_T[b.type].fiber&&(!BIZ_T[b.type].event||eventLive(b))).reduce((a,b)=>a+b.bw,0);const d=eye+biz;
+    const p=S.pops[c],SH=cnCity(c)?NSH_CN:ruCity(c)?NSH_RU:NSH;const eye=(p.bb?p.bb.d:0)*viral*(cnCity(c)&&ev.golden>day?1.4:1);const biz=S.biz.filter(b=>b.city===c&&!BIZ_T[b.type].l2&&!BIZ_T[b.type].fiber&&(!BIZ_T[b.type].event||eventLive(b))).reduce((a,b)=>a+b.bw,0);const d=eye+biz+dcDemand(c);
     R2.cityEye[c]=eye;R2.cityDem[c]=d;R2.citySrv[c]=0;R2.demand+=d;
     for(const n of NETS)R2.demTo[n.id]=(R2.demTo[n.id]||0)+d*(SH[n.id]||0);
     if(!popUp(c))continue;
-    const dd=ev.ddos&&ev.ddos.city===c&&ev.ddos.until>day?d*0.7*(S.scrubAt?0.15:1):0;
+    const dd=ev.ddos&&ev.ddos.city===c&&ev.ddos.until>day?Math.max(0,d*.7-scrubCapacity(c)):0;
     const bh=dd&&TRX&&TRX.blackhole;if(dd&&!bh)for(const n of NETS)flows.push({c,n:n.id,rem:dd*NSH[n.id],junk:true});if(bh)R2.teBlack+=dd+d*0.1;
     R2.cityBlocked=R2.cityBlocked||{};
     for(const n of NETS){const a=d*(SH[n.id]||0)*(bh?0.9:1);if(a<=0)continue;
@@ -1520,6 +1521,9 @@ function compute(){
   // money
   const C=R2.cost,V=R2.rev,pm=S.priceMul;
   C.pops=Object.values(S.pops).reduce((a,p)=>a+POP_MO+((p.routers||1)-1)*ROUTER_MO+(p.routers||1)*RG[p.rgen||0].mo+(p.gen?GEN_MO:0),0);
+  C.power=Object.keys(S.pops).reduce((v,c)=>v+powerBill(c),0);
+  C.hosting=Object.keys(S.pops).reduce((v,c)=>{const d=dcOf(c);return v+d.racks*RACK_MO+d.web*SERVER_ROLE.web.mo+d.cloud*SERVER_ROLE.cloud.mo+d.scrub*SERVER_ROLE.scrub.mo;},0);
+  C.maintenance=Object.values(S.pops).reduce((v,p)=>v+(p.routers||1)*40,0);
   C.optical=S.links.filter(l=>l.kind==='df').reduce((a,l)=>a+(l.ready>S.day?0:ampCount(l.km)*AMP_MO)+(l.spares?Math.round(150+(l.ch||[]).length*80):0),0);
   C.links=S.links.reduce((a,l)=>a+(l.mo||0),0);
   C.nni=(S.nni||[]).reduce((a,x)=>a+NNI[x.tier].mo,0);
@@ -1529,13 +1533,13 @@ function compute(){
   C.caches=S.caches.length*CACHE_MO;
   C.loans=(S.loans||[]).reduce((a,l)=>a+(BANKS[l.bank].equity?0:l.pay),0);
   C.extras=(S.cnLic&&S.cnLic.state==='ok'?CN_JV_MO:0)+(S.scrubAt?SCRUB_MO:0)+Object.keys(S.pops).filter(ruCity).length*RU_BOX_MO+Object.values(S.pops).filter(p=>p.site2).length*SITE2_MO+(S.te?TE_MO:0);
-  V.eyeballs=0;V.business=0;V.ix=0;
+  V.eyeballs=0;V.business=0;V.ix=0;V.hosting=Object.keys(S.pops).reduce((v,c)=>v+dcRevenue(c,R2),0);
   for(const c in S.pops){const sf=sfOf(R2,c);V.eyeballs+=R2.cityEye[c]*sf*EYE_RATE*(CITY[c].arpu||1);}
-  for(const b of S.biz){const sf=BIZ_T[b.type].fiber?(fiberOk(b)?1:0):BIZ_T[b.type].l2?clamp((R2.l2[b.id]||0)/b.bw,0,1):sfOf(R2,b.city);V.business+=b.bw*b.rate*Math.min(1,sf/0.95);}
+  for(const b of S.biz){const sf=BIZ_T[b.type].fiber?(fiberOk(b)?1:0):BIZ_T[b.type].l2?clamp((R2.l2[b.id]||0)/b.bw,0,1):sfOf(R2,b.city);V.business+=b.bw*b.rate*Math.min(1,(b.type==='scrub'?Math.min(sf,scrubFraction(b.city)):sf)/0.95);}
   for(const c in S.myIx)V.ix+=S.myIx[c].members.length*MYIX_FEE;
-  C.revshare=(S.loans||[]).reduce((a,l)=>a+(BANKS[l.bank].equity?l.share:0),0)*(V.eyeballs+V.business+V.ix);
+  C.revshare=(S.loans||[]).reduce((a,l)=>a+(BANKS[l.bank].equity?l.share:0),0)*(V.eyeballs+V.business+V.ix+V.hosting);
   R2.costMo=Object.values(C).reduce((a,b)=>a+b,0);
-  R2.revMo=V.eyeballs+V.business+V.ix;
+  R2.revMo=V.eyeballs+V.business+V.ix+V.hosting;
   R=R2;UI.hotMap=hotByCity();
 }
 function p95(t,cur){const h=(t.hist||[]).slice(-29).concat([cur]).sort((a,b)=>a-b);return h[Math.max(0,Math.ceil(.95*h.length)-1)];}
@@ -1553,14 +1557,16 @@ function sanitize(s){
   const arr=k=>{if(!Array.isArray(s[k]))s[k]=[];},obj=k=>{if(!s[k]||typeof s[k]!=='object'||Array.isArray(s[k]))s[k]={};};
   ['links','nni','transit','pni','caches','biz','offers','inc','usedNames','loans','loanOffers','hist','log'].forEach(arr);
   ['pops','ixp','rs','peers','myIx','done','ev','stats','ixn','ixPref','ixSite','confReg','ach'].forEach(obj);
+  s.opsSince=num(s.opsSince,s.day||0);
   s.v=1;s.name=String(s.name==null?'Packet Pals':s.name).slice(0,24);s.day=int(s.day,0,1e7,0);s.cash=num(s.cash,0);s.asn=int(s.asn,1,4294967294,200000);
   s.priceMul=num(s.priceMul,1);s.nextFail=num(s.nextFail,s.day+45);s.nextEvent=num(s.nextEvent,s.day+40);s.lvl=int(s.lvl,1,4,1);s.neg=int(s.neg,0,1e7,0);s.loanStrikes=int(s.loanStrikes,0,1e3,0);
   for(const k of Object.keys(s.stats)){const v=s.stats[k];if(k==='by'||k==='f'){if(!v||typeof v!=='object')s.stats[k]={};else for(const j of Object.keys(v))v[j]=num(v[j],0);}else if(typeof v!=='boolean')s.stats[k]=num(v,0);}
   for(const k of ['survived','incidents','peak'])s.stats[k]=num(s.stats[k],0);
-  for(const c of Object.keys(s.pops)){const p=s.pops[c];if(!isCity(c)||!p||typeof p!=='object'){delete s.pops[c];continue;}p.routers=int(p.routers,1,RMAX,1);if(p.rgen!==undefined)p.rgen=int(p.rgen,0,RG.length-1,0);p.down=num(p.down,0);if(p.bb&&typeof p.bb==='object')p.bb.d=num(p.bb.d,0);else p.bb=null;}
+  for(const c of Object.keys(s.pops)){const p=s.pops[c];if(!isCity(c)||!p||typeof p!=='object'){delete s.pops[c];continue;}p.routers=int(p.routers,1,RMAX,1);if(p.rgen!==undefined)p.rgen=int(p.rgen,0,RG.length-1,0);p.down=num(p.down,0);p.ups=!!p.ups;p.dualFeed=!!p.dualFeed;p.gridRegional=!!p.gridRegional;for(const k of ['gridUntil','upsUntil','upsReady','genMaintUntil','serverMaintUntil','routerDue','generatorDue','serverDue'])if(p[k]!==undefined)p[k]=int(p[k],0,1e7,0);p.gridSite=['a','b'].includes(p.gridSite)?p.gridSite:null;
+    if(p.dc&&typeof p.dc==='object'&&!Array.isArray(p.dc)){const d=p.dc;d.racks=int(d.racks,0,MAX_RACKS,0);let free=d.racks*RACK_U;for(const role of ['web','cloud','scrub']){d[role]=int(d[role],0,free,0);free-=d[role];}d.tenants=int(d.tenants,0,free,0);d.webClients=int(d.webClients,0,d.web*20,0);d.cloudClients=int(d.cloudClients,0,d.cloud*6,0);d.health=int(d.health,0,100,100);}else delete p.dc;if(p.bb&&typeof p.bb==='object')p.bb.d=num(p.bb.d,0);else p.bb=null;}
   if(!isCity(s.home))s.home=Object.keys(s.pops)[0]||'fra';
   const tier=v=>int(v,0,PORT.length-1,0),lag=v=>int(v,1,LAG_MAX,1),sid=v=>String(v==null?uid():v).slice(0,40);
-  s.links=s.links.filter(l=>l&&isCity(l.a)&&isCity(l.b)&&l.a!==l.b).map(l=>{l.id=sid(l.id);l.km=num(l.km,kmBetween(l.a,l.b));l.mo=num(l.mo,0);l.cut=num(l.cut,0);if(l.kind!=='df'&&l.kind!=='vxc')l.kind='wave';if(l.kind==='wave')l.tier=int(l.tier,0,LT.length-1,0);if(l.cable&&!own(CAB,l.cable))l.cable=null;if(l.kind==='vxc'&&!own(VXC,l.vt))l.vt=0;if(l.kind==='df'){if(!own(DF_SYS,l.sys))l.sys='lite';l.ch=Array.isArray(l.ch)?l.ch.filter(o=>own(OPT,o)):[];l.ready=num(l.ready,0);}if(l.metric&&!own(MET,l.metric))l.metric='normal';return l;});
+  s.links=s.links.filter(l=>l&&isCity(l.a)&&isCity(l.b)&&l.a!==l.b).map(l=>{l.id=sid(l.id);l.km=num(l.km,kmBetween(l.a,l.b));l.mo=num(l.mo,0);l.cut=num(l.cut,0);if(l.kind!=='df'&&l.kind!=='vxc')l.kind='wave';if(l.kind==='wave')l.tier=int(l.tier,0,LT.length-1,0);if(l.cable&&!own(CAB,l.cable))l.cable=null;if(l.kind==='vxc'&&!own(VXC,l.vt))l.vt=0;if(l.kind==='df'){if(!own(DF_SYS,l.sys))l.sys='lite';l.ch=Array.isArray(l.ch)?l.ch.filter(o=>own(OPT,o)):[];l.ready=num(l.ready,0);}if(l.opticalDue!==undefined)l.opticalDue=int(l.opticalDue,0,1e7,0);if(l.metric&&!own(MET,l.metric))l.metric='normal';return l;});
   s.transit=s.transit.filter(t=>t&&isCity(t.city)&&isNet(t.net)).map(t=>(t.site=['a','b','ab'].includes(t.site)?t.site:'a',t.id=sid(t.id),t.tier=tier(t.tier),t.n=lag(t.n),t.down=num(t.down,0),t));
   s.pni=s.pni.filter(x=>x&&isCity(x.city)&&isNet(x.net)).map(x=>(x.site=['a','b','ab'].includes(x.site)?x.site:'a',x.id=sid(x.id),x.tier=tier(x.tier),x.n=lag(x.n),x));
   s.caches=s.caches.filter(x=>x&&isCity(x.city)&&isNet(x.net)&&NET[x.net].cache).map(x=>(x.id=sid(x.id),x));
@@ -1574,7 +1580,7 @@ function sanitize(s){
   s.biz=s.biz.filter(okBiz).map(fixBiz);s.offers=s.offers.filter(okBiz).map(fixBiz);
   s.inc=s.inc.filter(i=>i&&typeof i.type==='string').map(i=>(i.id=sid(i.id),i.until=num(i.until,s.day),i.cost=num(i.cost,0),i.msg=String(i.msg||'').slice(0,400),i.fix=i.fix==null?undefined:String(i.fix).slice(0,60),i));
   s.loans=s.loans.filter(l=>l&&own(BANKS,l.bank));s.loanOffers=s.loanOffers.filter(l=>l&&own(BANKS,l.bank));
-  s.usedNames=s.usedNames.filter(x=>typeof x==='string');s.log=s.log.filter(e=>e&&typeof e.t==='string').slice(0,30);
+  s.usedNames=s.usedNames.filter(x=>typeof x==='string');s.log=s.log.filter(e=>e&&typeof e.t==='string').slice(0,300).map(e=>({d:int(e.d,0,s.day,0),t:e.t.slice(0,1000),k:['bad','good','goal',''].includes(e.k)?e.k:'',cat:own(LOG_CATS,e.cat)&&e.cat!=='all'?e.cat:eventCategory(e.t),city:isCity(e.city)?e.city:null}));
   if(s.scrubAt&&!isCity(s.scrubAt))s.scrubAt=null;
   if(s.te){if(typeof s.te!=='object')s.te=null;else{s.te.on=!!s.te.on;s.te.script=typeof s.te.script==='string'?s.te.script.slice(0,4000):'';}}
   return s;}
@@ -1595,7 +1601,7 @@ const REQS={
  metro:{l:'Two data centers in every metro they touch',bonus:.2,only:true,ok:b=>[b.city,b.city2].filter(Boolean).every(c=>S.pops[c]&&S.pops[c].site2)},
  twoup:{l:'Wants two different transit providers (or none at all)',bonus:.15,ip:true,ok:()=>new Set(S.transit.map(t=>t.net)).size>=2||S.transit.length===0},
  china:{l:'Needs low-loss reach into China',bonus:.3,ip:true,ok:()=>S.transit.some(t=>t.premium&&t.city==='hkg')||S.links.some(l=>l.premium)||S.pni.some(p=>NET[p.net].cn)},
- scrubbed:{l:'Will only sign with a network that runs a DDoS scrubbing center',bonus:.15,ok:()=>!!S.scrubAt},
+ scrubbed:{l:'Will only sign with a network that runs DDoS scrubbing capacity',bonus:.15,ok:()=>scrubCapacity()>0},
  puns:{l:'Their CEO hates puns. Please do not mention the network names.',bonus:.05,ok:()=>true},
 };
 function terrestrialPath(a,b){const ls=S.links.filter(l=>!linkDown(l)&&!l.sub);const adj={};for(const l of ls){(adj[l.a]=adj[l.a]||[]).push(l.b);(adj[l.b]=adj[l.b]||[]).push(l.a);}const seen=new Set([a]),q=[a];while(q.length){const u=q.shift();if(u===b)return true;for(const v of adj[u]||[])if(!seen.has(v)){seen.add(v);q.push(v);}}return false;}
@@ -1610,7 +1616,7 @@ function diversePaths(a,b){
   const p1=bfs(live);if(!p1)return false;const used=new Set(p1.map(srlg));return !!bfs(live.filter(l=>!used.has(srlg(l))));}
 function fiberOk(b){const l=S.links.find(x=>x.id===b.link);if(!l)return false;if(b.type==='dfpair'||b.type==='pairs')return l.ready<=S.day&&!(l.cut>S.day);return l.ready<=S.day&&!(l.cut>S.day)&&!(l.eqDown>S.day);}
 function soldSlots(l){return S.biz.filter(b=>b.type==='wwave'&&b.link===l.id).reduce((a,b)=>a+(b.slots||0),0);}
-function bizSf(b){const T=BIZ_T[b.type];return T.fiber?(fiberOk(b)?1:0):T.l2?clamp((R.l2[b.id]||0)/b.bw,0,1):sfOf(R,b.city);}
+function bizSf(b){const T=BIZ_T[b.type];if(b.type==='scrub')return Math.min(sfOf(R,b.city),scrubFraction(b.city));return T.fiber?(fiberOk(b)?1:0):T.l2?clamp((R.l2[b.id]||0)/b.bw,0,1):sfOf(R,b.city);}
 function bCities(o){return o.sites?o.sites.slice():[o.city,o.city2].filter(Boolean);}
 function bHas(o){return bCities(o).every(c=>S.pops[c]);}
 function eventLive(b){return BIZ_T[b.type].event&&S.day>=b.start&&S.day<b.start+b.dur;}
@@ -1689,7 +1695,7 @@ const RT={normal:'Follow metrics',fast:'Lowest latency',scenic:'Scenic (quietest
 function routeCtl(b){const lt=R.l2lat[b.id];return `<div class="btns"><span class="meta" style="align-self:center">Route:</span>${Object.keys(RT).map(m=>btn(RT[m],'setRoute',{id:b.id,m},(b.route||'normal')===m?'pink sm':'ghost sm')).join('')}</div><div class="meta">Path latency: <b>${lt!==undefined&&isFinite(lt)?lt.toFixed(1)+' ms one-way':'no path right now'}</b>${b.latMax?` · budget ${b.latMax} ms`:''}</div>`;}
 function nodeCap(c){const p=S.pops[c];if(!p)return Infinity;const eff=(p.routers||1)-(p.rdown>S.day?1:0);return RG[p.rgen||0].cap*Math.max(1,eff)*(p.hot>S.day?(p.site2?0.75:0.5):1)*(p.site2&&(siteDown(c,'a')||siteDown(c,'b'))?0.5:1);}
 // With a second site, one building can be dark (or cut off by a ring cut) while the other carries on.
-function siteDown(c,s){const p=S.pops[c];if(!p||!p.site2)return false;if(S.inc.some(i=>i.type==='site'&&i.ref===c&&i.site===s&&i.until>S.day))return true;return s==='b'&&p.ringcut>S.day;}
+function siteDown(c,s){const p=S.pops[c];if(!p||!p.site2)return false;if(p.gridUntil>S.day&&!backupPower(c)&&p.gridSite===s)return true;if(S.inc.some(i=>i.type==='site'&&i.ref===c&&i.site===s&&i.until>S.day))return true;return s==='b'&&p.ringcut>S.day;}
 // Ports can live in site A, site B, or be split across both ('ab'): a LAG with members in each
 // building, so one dark building only takes out its half.
 function liveN(c,site,n){n=n||1;const p=S.pops[c];if(!p||!p.site2)return n;if(site==='ab'){const a=Math.ceil(n/2),b=n-a;return (siteDown(c,'a')?0:a)+(siteDown(c,'b')?0:b);}return siteDown(c,site==='b'?'b':'a')?0:n;}
@@ -1705,8 +1711,98 @@ function routerModels(c){const p=S.pops[c],g=p.rgen||0,rt=p.routers||1;
 function portNote(c){const p=S.pops[c];if(!p)return '';const g=p.rgen||0;return RG[g].maxP<PORT.length-1?`<p class="note" style="margin-top:0">Your ${esc(RG[g].n)} here tops out at ${RG[g].pn} ports. Bigger ports need a router upgrade (Infra tab).</p>`:'';}
 function sfOf(r,c){const d=r.cityDem[c]||0;return d<=1e-6?1:clamp(r.citySrv[c]/d,0,1);}
 
+/* ---------- power, automatic maintenance and server rooms ---------- */
+const UPS_COST=8000,UPS_MO=80,FEED_COST=18000,FEED_MO=180,RACK_COST=18000,RACK_MO=350,RACK_U=20,MAX_RACKS=12;
+const POWER_RATES={EU:.24,NA:.12,AS:.15,AF:.20,SA:.18,OC:.22};
+const ROUTER_KW=[.8,2,5,12,.35,1.5,2.4,6,5.5,10];
+const SERVER_ROLE={web:{l:'Web hosting',cost:1800,mo:35,kw:.25,clients:20,rate:18,gbps:.1},cloud:{l:'Cloud instances',cost:2600,mo:50,kw:.35,clients:6,rate:60,gbps:.5},scrub:{l:'DDoS scrubbing',cost:8000,mo:120,kw:.6,gbps:100}};
+const DC_EMPTY={racks:0,tenants:0,web:0,cloud:0,scrub:0,webClients:0,cloudClients:0,health:100};
+const dcOf=c=>S.pops[c].dc||DC_EMPTY;
+const dcSlots=d=>d.web+d.cloud+d.scrub;
+const dcFree=d=>Math.max(0,d.racks*RACK_U-d.tenants-dcSlots(d));
+const powerRate=c=>+(POWER_RATES[CITY[c].reg]*(.85+hstr(c+'|power')%31/100)).toFixed(3);
+function powerKW(c){const p=S.pops[c],d=dcOf(c);let kw=(ROUTER_KW[p.rgen||0]||.8)*(p.routers||1)+portsUsed(c)*.025;
+  kw+=S.caches.filter(x=>x.city===c).length*1.2+(S.scrubAt===c?3:0)+(S.myIx[c]?.8:0)+(p.site2?.2:0);
+  for(const l of S.links)if(l.kind==='df'&&(l.a===c||l.b===c))kw+=(l.sys==='roadm'?.6:.2)+(l.ch||[]).length*.06+ampCount(l.km)*.04;
+  kw+=d.racks*.25+d.tenants*.15+d.web*.25+d.cloud*.35+d.scrub*.6;
+  return kw*1.35; /* cooling and conversion losses */
+}
+function onGenerator(c){const p=S.pops[c];return p.gridUntil>S.day&&p.gen&&!(p.genMaintUntil>S.day);}
+function backupPower(c){const p=S.pops[c];return onGenerator(c)||!!(p.ups&&p.upsUntil>S.day);}
+function powerAvailable(c){const p=S.pops[c];return !(p.gridUntil>S.day)||backupPower(c)||!!(p.site2&&p.gridSite&&!siteDown(c,p.gridSite==='a'?'b':'a'));}
+function powerBill(c){const p=S.pops[c],supply=p.gridUntil>S.day&&!backupPower(c)?p.gridSite?.5:0:1;return powerKW(c)*supply*720*(onGenerator(c)?.6:powerRate(c))+(p.ups?UPS_MO:0)+(p.dualFeed?FEED_MO:0);}
+function supplyLabel(c){const p=S.pops[c];if(!(p.gridUntil>S.day))return 'Grid'+(p.dualFeed?' · dual feed':'');if(onGenerator(c))return 'Generator · fuel billed';if(backupPower(c))return 'UPS · '+Math.max(0,p.upsUntil-S.day)+'d battery';return p.gridSite?'Site '+p.gridSite.toUpperCase()+' dark':'No power';}
+function gridOutage(c,days,{regional=false,message='The grid has gone away. It did not leave a forwarding address.'}={}){
+  const p=S.pops[c];if(!p)return;
+  if(p.dualFeed&&!regional){S.stats.survived++;toast(`<b>Power feed lost in ${CITY[c].name}</b><br>The second feed kept everything running.`,'good');return;}
+  const continuing=p.gridUntil>S.day,oldBattery=p.upsUntil||0;
+  p.gridRegional=regional||!!(continuing&&p.gridRegional);p.gridUntil=Math.max(p.gridUntil||0,S.day+days);p.gridSite=p.site2&&!regional&&(!continuing||p.gridSite)?(p.gridSite||(Math.random()<.5?'a':'b')):null;
+  if(!continuing&&p.ups&&!(p.upsReady>S.day)){p.upsUntil=S.day+1;p.upsReady=p.gridUntil+1;}else p.upsUntil=oldBattery;
+  if(p.ups)p.upsReady=Math.max(p.upsReady||0,p.gridUntil+1);
+  const covered=backupPower(c);if(covered||p.gridSite)S.stats.survived++;if(covered&&CITY[c].za)S.stats.shed=(S.stats.shed||0)+1;
+  addInc({type:'grid',ref:c,until:p.gridUntil,msg:`${message} ${CITY[c].name}: ${supplyLabel(c)}. Grid expected back in ${p.gridUntil-S.day} days.`,cost:0});
+  toast(`<b>Power outage in ${CITY[c].name}</b><br>${esc(message)} ${esc(supplyLabel(c))}. ${p.ups&&!p.gen?'The battery buys one game day. It is a buffer, not a power station.':''}`,covered?'good':'bad',[{l:'Power & Infra',act:'opsCity',args:{city:c}}]);
+}
+function dcAvailable(c){const p=S.pops[c];if(!popUp(c))return 0;return p.site2&&(siteDown(c,'a')||siteDown(c,'b'))?.5:1;}
+function serviceNodes(c,role){const p=S.pops[c],n=dcOf(c)[role]||0;return p.serverMaintUntil>S.day&&n<2?0:n;}
+function dcDemand(c){const d=dcOf(c);return d.tenants*.8+d.webClients*.1+d.cloudClients*.5;}
+function dcService(c,r=R){const d=dcOf(c),avail=dcAvailable(c),sf=sfOf(r,c);return {colo:sf*avail,web:sf*avail*(d.webClients?Math.min(1,serviceNodes(c,'web')*20/d.webClients):1),cloud:sf*avail*(d.cloudClients?Math.min(1,serviceNodes(c,'cloud')*6/d.cloudClients):1)};}
+function dcRevenue(c,r=R){const d=dcOf(c),s=dcService(c,r);return d.tenants*200*s.colo+d.webClients*18*s.web+d.cloudClients*60*s.cloud;}
+function scrubConnected(a,b){if(a===b)return popUp(a);const seen=new Set([a]),q=[a];while(q.length){const c=q.shift();for(const l of S.links){if(linkDown(l)||l.a!==c&&l.b!==c)continue;const n=l.a===c?l.b:l.a;if(!popUp(n)||seen.has(n))continue;if(n===b)return true;seen.add(n);q.push(n);}}return false;}
+function scrubCapacity(target){let total=0;for(const c in S.pops){const raw=(S.scrubAt===c?400:0)+serviceNodes(c,'scrub')*100;if(!raw||!popUp(c)||target&&!scrubConnected(c,target))continue;total+=Math.min(raw*dcAvailable(c),nodeCap(c));}return total;}
+function scrubFraction(c){const demand=S.biz.filter(b=>b.type==='scrub'&&(b.city===c||scrubConnected(c,b.city))).reduce((v,b)=>v+b.bw,0);return demand?Math.min(1,scrubCapacity(c)/demand):scrubCapacity(c)>0?1:0;}
+function maintenanceDate(c,kind){const p=S.pops[c];return p[kind+'Due']===undefined?Math.max(p.day||0,S.opsSince||0)+(kind==='router'?90:kind==='server'?60:180)+hstr(c+'|'+kind)%20:p[kind+'Due'];}
+function operationsTick(){
+  const day=S.day;
+  for(const c in S.pops){const p=S.pops[c],dc=dcOf(c);
+    if(p.gridUntil===day){recordEvent(`Grid restored in ${CITY[c].name}. UPS recharges for one day.`,'good','power',c);}
+    if(p.upsUntil===day&&p.gridUntil>day&&!onGenerator(c))toast(`<b>UPS exhausted in ${CITY[c].name}</b><br>The very expensive countdown timer reached zero. ${p.gridSite?'One building is now dark.':'The POP is now dark.'}`,'bad',[{l:'Power & Infra',act:'opsCity',args:{city:c}}]);
+    for(const kind of ['router','generator','server']){
+      if(kind==='generator'&&!p.gen||kind==='server'&&!dcSlots(dc))continue;
+      let due=maintenanceDate(c,kind);if(p[kind+'Due']===undefined)p[kind+'Due']=due;
+      if(day===due-7)recordEvent(`${CITY[c].name}: automatic ${kind} maintenance in 7 days. ${kind==='router'?(p.routers||1)>1?'Rolling service, no customer impact.':'Single router: one day offline.':kind==='server'?'Each service needs two servers for uninterrupted maintenance.':'Generator will be unavailable for one day; grid stays online.'}`,'','maintenance',c);
+      if(day<due||p.down>day||p.rdown>day||p.hot>day||p.gridUntil>day)continue;
+      p[kind+'Due']=day+(kind==='router'?90:kind==='server'?60:180);
+      if(kind==='router'){
+        if((p.routers||1)>1||S.mode==='sandbox')recordEvent(`${CITY[c].name}: automatic rolling router maintenance completed. Customers stayed online.`,'good','maintenance',c);
+        else{p.down=day+1;addInc({type:'maint',ref:c,until:day+1,msg:`Automatic router maintenance in ${CITY[c].name}. Only one router: back tomorrow.`,cost:0});toast(`<b>Automatic maintenance in ${CITY[c].name}</b><br>One router, one day offline. Add a second router to make future service hitless.`,'bad');}
+      }else if(kind==='generator'){p.genMaintUntil=day+1;recordEvent(`${CITY[c].name}: generator serviced automatically. Grid online; generator unavailable for one day.`,'','maintenance',c);}
+      else{p.serverMaintUntil=S.mode==='sandbox'?day:day+1;recordEvent(`${CITY[c].name}: automatic server maintenance. Services with two or more servers stay online; single-server services return tomorrow.`,'','maintenance',c);}
+    }
+  }
+  for(const l of S.links){if(l.kind!=='df'||!(l.ch||[]).length)continue;if(l.opticalDue===undefined)l.opticalDue=Math.max(l.ready||0,S.opsSince||0)+120+hstr(l.id)%20;
+    if(day===l.opticalDue-7)recordEvent(`${CITY[l.a].name}–${CITY[l.b].name}: automatic optical maintenance in 7 days. Traffic will use any available backup path.`,'','maintenance',l.a);
+    if(day>=l.opticalDue&&!linkDown(l)&&!(l.eqDown>day)){l.opticalDue=day+120;if(S.mode==='sandbox')continue;l.eqDown=day+1;addInc({type:'opticmaint',ref:l.id,until:day+1,msg:`Automatic optical maintenance on ${CITY[l.a].name}–${CITY[l.b].name}. Channels return tomorrow; alternate paths carry traffic.`,cost:0});}
+  }
+}
+function hostingTick(){
+  for(const c in S.pops){const p=S.pops[c],d=p.dc;if(!d||!d.racks)continue;const svc=dcService(c),ok=svc.colo>=.95&&R.reach>.99;
+    const active=['colo',...(d.webClients?['web']:[]),...(d.cloudClients?['cloud']:[])];const worst=Math.min(...active.map(k=>svc[k]));
+    const hasCustomers=d.tenants+d.webClients+d.cloudClients>0;
+    d.health=hasCustomers?clamp(d.health+(worst>=.95&&R.reach>.99?2:-8),0,100):100;
+    if(d.health<30&&!d.warned){d.warned=true;toast(`<b>Hosting customers in ${CITY[c].name} are furious.</b><br>Check power, network capacity and server maintenance.`,'bad',[{l:'Server room',act:'hostingCity',args:{city:c}}]);if(UI.autoPause!==false){UI.speed=0;acc=0;}}
+    if(d.health>60)d.warned=false;
+    if(S.day%7!==hstr(c)%7)continue;
+    if(ok){let added=0;if(dcFree(d)>0){d.tenants++;added++;}for(const role of ['web','cloud']){const max=d[role]*SERVER_ROLE[role].clients;if(d[role+'Clients']<max&&serviceNodes(c,role)>0){const n=Math.min(max-d[role+'Clients'],role==='web'?4:2);d[role+'Clients']+=n;added+=n;}}
+      if(added)recordEvent(`${CITY[c].name}: ${added} new hosting tenants and service customers. The server room is getting louder.`,'good','hosting',c);
+    }else if(d.health<40){let lost=0;if(d.tenants){d.tenants--;lost++;}for(const role of ['web','cloud'])if(d[role+'Clients']){d[role+'Clients']--;lost++;}if(lost)recordEvent(`${CITY[c].name}: ${lost} hosting customers left after poor service.`,'bad','hosting',c);}
+  }
+}
+const LOG_CATS={all:'All',power:'Power',maintenance:'Maintenance',hosting:'Hosting',customers:'Customers',peering:'Peering',network:'Network',finance:'Finance',general:'Other'};
+function eventCategory(t){return /UPS|generator|power|grid|load shedding|blackout/i.test(t)?'power':/maintenan|router.*swap|rolling upgrade/i.test(t)?'maintenance':/hosting|server room/i.test(t)?'hosting':/customer|cancelled|furious|unhappy/i.test(t)?'customers':/peer|IX |exchange/i.test(t)?'peering':/loan|cash|bank|grant/i.test(t)?'finance':/cut|outage|fiber|route|DDoS/i.test(t)?'network':'general';}
+function recordEvent(t,k='',cat,city){if(!S)return;S.log=S.log||[];S.log.unshift({d:S.day,t:String(t).slice(0,1000),k,cat:cat||eventCategory(t),city:isCity(city)?city:null});if(S.log.length>300)S.log.length=300;}
+function renderEventLog(){if(document.activeElement?.id==='logQuery'&&UI._dashRendered==='log')return;const cat=UI.logCat||'all',q=(UI.logQuery||'').toLowerCase(),events=(S.log||[]).filter(e=>(cat==='all'||(e.cat||eventCategory(e.t))===cat)&&(!q||e.t.toLowerCase().includes(q)));
+  const h=`<div style="display:flex;align-items:center;gap:10px"><div class="grow"><div class="eyebrow">NOC · Saved with your network</div><h2 style="font-size:28px">Event log</h2></div>${btn('NOC','customerNoc',{},'ghost sm')}<button class="x" data-act="dashClose" aria-label="Close">×</button></div><p class="note">The latest 300 entries, newest first. Incidents, recovery, automatic maintenance and customer changes survive reloads.</p><div class="btns">${Object.entries(LOG_CATS).map(([v,l])=>btn(l,'logFilter',{v},cat===v?'pink sm':'ghost sm')).join('')}</div><div class="btns" style="margin:10px 0"><label for="logQuery">Search </label><input class="t" style="max-width:360px;font-size:14px" id="logQuery" value="${esc(UI.logQuery||'')}" placeholder="City, customer or incident"><button class="b sm" data-act="logSearch">Search</button></div><div class="panel2"><p class="meta">${events.length} matching entries</p>${events.map(e=>`<div class="row"><span class="tag ${e.k==='bad'?'restrictive':e.k==='good'?'open':'st'}">${dateStr(e.d)}</span><div class="grow"><div class="meta">${LOG_CATS[e.cat||eventCategory(e.t)]||'Other'}</div><div>${esc(e.t)}</div></div>${isCity(e.city)&&S.pops[e.city]?btn('Show','opsCity',{city:e.city},'ghost sm'):''}</div>`).join('')||'<p class="empty">Nothing here. Suspiciously peaceful.</p>'}</div>`;
+  if(h!==UI._logHTML||UI._dashRendered!=='log'){$('dashCard').innerHTML=h;UI._logHTML=h;UI._dashRendered='log';}
+}
+function powerSection(c){const p=S.pops[c],kw=powerKW(c);return `<section><h3>Power & cooling</h3><p class="lead">Every chassis, cache, optical shelf and server needs power. Cooling adds 35%. Rates are game-world tariffs, fixed per city.</p><div class="kv"><span>Facility load</span><b>${kw.toFixed(2)} kW · ${Math.round(kw*720).toLocaleString()} kWh/mo</b></div><div class="kv"><span>Grid tariff</span><b>$${powerRate(c).toFixed(3)}/kWh</b></div><div class="kv"><span>Power bill, including backup upkeep</span><b>${fmt$(powerBill(c))}/mo</b></div><div class="kv"><span>Supply</span><b>${supplyLabel(c)}</b></div><div class="kv"><span>UPS</span><b>${p.ups?p.upsReady>S.day?'Recharging / reserved for this outage':'Charged · one game day':'None'}</b></div><div class="kv"><span>Generator</span><b>${p.gen?p.genMaintUntil>S.day?'Automatic service until tomorrow':'Installed · automatic service':'None'}</b></div><div class="kv"><span>Independent grid feeds</span><b>${p.dualFeed?'Two':'One'}</b></div><div class="btns">${!p.ups?btn(`Install UPS <small>${fmt$(UPS_COST)} + ${fmt$(UPS_MO)}/mo</small>`,'powerBuy',{city:c,item:'ups'},'sm',S.cash<UPS_COST):''}${!p.gen?btn(`Install generator <small>${fmt$(GEN_COST)} + ${fmt$(GEN_MO)}/mo</small>`,'addGen',{city:c},'sm',S.cash<GEN_COST):''}${!p.dualFeed?btn(`Second feed <small>${fmt$(FEED_COST)} + ${fmt$(FEED_MO)}/mo</small>`,'powerBuy',{city:c,item:'dualFeed'},'sm',S.cash<FEED_COST):''}</div><p class="note">UPS bridges short cuts and generator servicing. Diesel costs $0.60/kWh while running. A second feed covers local faults; regional blackouts can take both down.</p><h4 class="sub4">Automatic maintenance</h4><div class="kv"><span>Next router service</span><b>${dateStr(maintenanceDate(c,'router'))}</b></div>${p.gen?`<div class="kv"><span>Next generator service</span><b>${dateStr(maintenanceDate(c,'generator'))}</b></div>`:''}<p class="note">Serviced automatically, with seven days' notice in the event log. Two routers allow rolling service and swaps with no customer impact. A single router goes offline for one game day. Maintenance labour is included in monthly upkeep.</p></section>`;}
+function hostingSection(c){const d=dcOf(c),svc=dcService(c);return `<section><h3>Server hosting</h3><p class="lead">Rent rack units to colocated customers, or fill them with your own web, cloud and scrubbing servers. New tenants arrive weekly while power, reach and service are healthy.</p><div class="kv"><span>Racks · 20U each</span><b>${d.racks} / ${MAX_RACKS}</b></div><div class="kv"><span>Rack space</span><b>${d.tenants+dcSlots(d)} / ${d.racks*RACK_U} U occupied</b></div><div class="kv"><span>Colocation tenants</span><b>${d.tenants} · $200/U/mo</b></div><div class="kv"><span>Hosting satisfaction</span><b>${Math.round(d.health)}%</b></div><div class="kv"><span>Traffic demand</span><b>${fmtG(dcDemand(c))}</b></div><div class="kv"><span>Revenue at current service</span><b>${fmt$(dcRevenue(c))}/mo</b></div><div class="btns">${btn(`Add rack <small>${fmt$(RACK_COST)} + ${fmt$(RACK_MO)}/mo</small>`,'rackBuy',{city:c},'pink sm',d.racks>=MAX_RACKS||S.cash<RACK_COST)}</div><p class="note">Each rack needs one router port; each own server uses 1U. Colocation fills remaining space; occupied tenant units are never silently evicted.</p>${d.tenants?btn(UI.confirm==='colo'+c?'Really end this lease?':'Reclaim 1U (end one colocation lease)','coloRelease',{city:c},'ghost sm'):''}${Object.entries(SERVER_ROLE).map(([role,T])=>`<div class="row"><div class="grow"><div class="nm">${T.l} · ${d[role]} server${d[role]===1?'':'s'}</div><div class="meta">${role==='scrub'?`${fmtG(serviceNodes(c,role)*100*dcAvailable(c))} active cleaning capacity`:`${d[role+'Clients']} / ${d[role]*T.clients} customers · $${T.rate}/customer/mo · ${pct(svc[role])} delivered`} · ${T.kw} kW/server before cooling</div><div class="btns">${btn(`Add server <small>${fmt$(T.cost)} + ${fmt$(T.mo)}/mo</small>`,'serverBuy',{city:c,role},'sm',dcFree(d)<1||S.cash<T.cost)}${d[role]?btn(UI.confirm===c+role?'Really remove?':'Remove one','serverRemove',{city:c,role},'ghost sm'):''}</div></div></div>`).join('')}<p class="note">Web: 20 accounts/server. Cloud: 6 instances/server. Scrubbing: 100 Gbps/server. Two servers per service allow rolling automatic maintenance. Single-server services pause for one game day.</p>${dcSlots(d)?`<div class="kv"><span>Next server maintenance</span><b>${dateStr(maintenanceDate(c,'server'))}</b></div>`:''}</section>`;}
+function hostingSummary(){let count=0,sum=0,furious=0;for(const c in S.pops){const d=dcOf(c),n=d.tenants+d.webClients+d.cloudClients;count+=n;sum+=n*d.health;if(d.health<30)furious+=n;}return {count,sum,furious};}
+function hostingCustomersPanel(){const cs=Object.keys(S.pops).filter(c=>{const d=dcOf(c);return d.racks>0;});return cs.length?`<div class="panel2" style="margin-top:12px"><h3>Hosting customers</h3>${cs.map(c=>{const d=dcOf(c);return `<div class="row"><div class="grow"><div class="nm">${CITY[c].name} · ${Math.round(d.health)}% satisfaction</div><div class="meta">${d.tenants} colocation tenants · ${d.webClients} web accounts · ${d.cloudClients} cloud instances · ${fmt$(dcRevenue(c))}/mo</div></div>${btn('Server room','hostingCity',{city:c},'ghost sm')}</div>`;}).join('')}</div>`:'';}
+function operationsDashboard(){const cs=Object.keys(S.pops),total=cs.reduce((v,c)=>v+powerKW(c),0),rev=cs.reduce((v,c)=>v+dcRevenue(c),0);return `<div class="panel2" style="margin-top:12px"><h3>Power & server rooms</h3><p class="note">${total.toFixed(1)} kW incl. cooling · ${fmt$(R.cost.power||0)}/mo power · ${fmt$(rev)}/mo hosting revenue · ${fmtG(scrubCapacity())} active DDoS cleaning</p><div class="tscroll"><table class="tbl"><thead><tr><th>POP</th><th>Power</th><th>Supply</th><th>Hosting</th><th>Next router service</th><th></th></tr></thead><tbody>${cs.map(c=>{const d=dcOf(c);return `<tr><td>${CITY[c].name}</td><td>${powerKW(c).toFixed(1)} kW · ${fmt$(powerBill(c))}/mo</td><td>${esc(supplyLabel(c))}</td><td>${d.racks} racks · ${d.tenants} colo · ${d.webClients+d.cloudClients} managed · ${Math.round(d.health)}%</td><td>${dateStr(maintenanceDate(c,'router'))}</td><td>${btn('Infra','opsCity',{city:c},'ghost sm')}</td></tr>`;}).join('')}</tbody></table></div>${btn('Event log','eventLog',{},'pink sm')}</div>`;}
+
 /* ---------- failures & events ---------- */
-function addInc(o){o.id=uid();o.start=S.day;S.inc.push(o);S.stats.incidents++;S.stats.by=S.stats.by||{};S.stats.by[o.type]=(S.stats.by[o.type]||0)+1;if(/shark/i.test(o.msg||''))S.stats.sharks=(S.stats.sharks||0)+1;const f=S.stats.f=S.stats.f||{};if(/anchor/i.test(o.msg||''))f.anchor=1;if(/crocodile/i.test(o.msg||''))f.croc=1;if(/llama/i.test(o.msg||''))f.llama=1;}
+function addInc(o){recordEvent(incTitle(o.type)+': '+o.msg,o.type==='maint'||o.type==='opticmaint'?'':'bad',o.type==='grid'?'power':o.type==='maint'||o.type==='opticmaint'?'maintenance':'network',isCity(o.ref)?o.ref:null);o.id=uid();o.start=S.day;S.inc.push(o);S.stats.incidents++;S.stats.by=S.stats.by||{};S.stats.by[o.type]=(S.stats.by[o.type]||0)+1;if(/shark/i.test(o.msg||''))S.stats.sharks=(S.stats.sharks||0)+1;const f=S.stats.f=S.stats.f||{};if(/anchor/i.test(o.msg||''))f.anchor=1;if(/crocodile/i.test(o.msg||''))f.croc=1;if(/llama/i.test(o.msg||''))f.llama=1;}
 const HARMLESS=[
  ['Certificate expired','The TLS certificate on your NOC dashboard expired. Nobody can see any graphs, so technically there are no problems.'],
  ['It was DNS','Someone deleted the DNS record for the internal wiki. The runbook for fixing DNS was on the wiki.'],
@@ -1788,9 +1884,7 @@ function fireFailure(){
   }else if(type==='crash'||type==='power'){
     const c=pick(Object.keys(S.pops).flatMap(x=>type==='power'&&(CITY[x].za||CITY[x].blackout)?[x,x,x]:type==='crash'&&RG[S.pops[x].rgen||0].flaky?[x,x,x]:[x])),pp=S.pops[c],slow=slowBoot(c),dur=(type==='crash'?2+Math.floor(Math.random()*2):3+Math.floor(Math.random()*3))*(type==='crash'&&S.ev.sanction>S.day?2:1)+(slow?2+Math.floor(Math.random()*3):0);
     if(type==='crash'&&(pp.routers||1)>=2){pp.rdown=S.day+dur;S.stats.incidents++;S.stats.survived++;toast(`<b>Router crash in ${CITY[c].name}</b><br>One router panicked and its twin took over.${slow?` The crashed one ${esc(pick(SLOW_BOOT))}.`:''} Capacity there is down one router for ${dur} days.`,'good');sfx('alert');return;}
-    if(type==='power'&&!pp.gen&&pp.site2){const sd=Math.random()<0.5?'a':'b';addInc({type:'site',ref:c,site:sd,until:S.day+dur,msg:`${CITY[c].za?'Load shedding':'A power cut'} took out ${siteName(c,sd)} in ${CITY[c].name}. ${siteName(c,sd==='a'?'b':'a')} kept going, so the POP runs at half capacity. Anything plugged in only at the dark site is offline.`,cost:5000,fix:'Rent a generator'});S.stats.survived++;return;}
-    if(type==='power'&&pp.gen&&CITY[c].blackout){S.stats.incidents++;S.stats.survived++;S.stats.shed=(S.stats.shed||0)+1;toast(`<b>Blackout in ${CITY[c].name}</b><br>The grid went dark again. Your generator started on the first try, like it always does here.`,'good');sfx('alert');return;}
-    if(type==='power'&&pp.gen){S.stats.incidents++;S.stats.survived++;if(CITY[c].za)S.stats.shed=(S.stats.shed||0)+1;toast(CITY[c].za?`<b>Load shedding in ${CITY[c].name}</b><br>Stage ${2+Math.floor(Math.random()*5)} today. Your generator coughed, then kept the lights on.`:`<b>Power cut in ${CITY[c].name}</b><br>Your backup generator kicked in. Lights stayed on.`,'good');sfx('alert');return;}
+    if(type==='power'){gridOutage(c,dur,{regional:!!(CITY[c].za||CITY[c].blackout),message:CITY[c].za?'Load shedding has reached your street.':CITY[c].blackout?'A regional blackout took both grid feeds down.':'A local grid fault took the primary feed down.'});compute();return;}
     pp.down=Math.max(pp.down||0,S.day+dur);
     const msg=type==='crash'?(slow?`Your router in ${CITY[c].name} crashed and is rebooting. It ${pick(SLOW_BOOT)}. Boot time on this one: about ${bootMin(c)} minutes per attempt, and it is on attempt ${2+Math.floor(Math.random()*5)}.`:pick([`Your router in ${CITY[c].name} crashed. Kernel panic, packet panic.`,`A firmware update bricked your router in ${CITY[c].name}.`])):CITY[c].blackout?`A blackout hit ${CITY[c].name} and your POP has no generator. Every other network here has one. Buy one.`:CITY[c].za?`Load shedding stage ${3+Math.floor(Math.random()*4)} in ${CITY[c].name}, and you have no generator. Buy one: here it is not optional.`:`Power outage at ${CITY[c].dc} in ${CITY[c].name}. The generator did not start.`;
     addInc({type,ref:c,until:S.pops[c].down,msg,slow:type==='crash'&&slow,cost:type==='crash'?2500:7000,fix:type==='crash'?(slow?'Turn it off and on again (it will take a while)':'Turn it off and on again'):'Rent a generator'});
@@ -1808,7 +1902,7 @@ function fireFailure(){
     addInc({type,ref:f,until:S.ev.fab[f],msg:`${FAB[f].name} is having a bad day. Every virtual circuit on their fabric is down.`,cost:0});
   }else if(type==='ddos'){
     const c=pick(Object.keys(S.pops));S.ev.ddos={city:c,until:S.day+4};
-    if(S.scrubAt){S.stats.survived++;toast(`<b>DDoS on ${CITY[c].name}</b><br>A botnet of smart toasters tried. Your scrubbing center in ${CITY[S.scrubAt].name} ate most of it.`,'good');sfx('alert');addInc({type,ref:c,until:S.day+4,msg:'Mostly absorbed by scrubbing.',cost:0});return;}
+    if(scrubCapacity(c)>0){toast(`<b>DDoS on ${CITY[c].name}</b><br>${fmtG(scrubCapacity(c))} of reachable cleaning capacity is working. Anything above capacity still hits your network.`,'goal');}
     addInc({type,ref:c,until:S.day+4,msg:`A botnet of smart toasters is DDoSing ${CITY[c].name}. Junk traffic is eating your capacity.`,cost:6000,fix:'Buy scrubbing'});
   }
   compute();
@@ -1818,8 +1912,9 @@ function fireFailure(){
   else toast(`<b>${incTitle(type)}</b><br>${esc(last.msg)}`,'bad',last.cost?[{l:`${last.fix||'Rush repair'} ${fmt$(last.cost)}`,act:'fixInc',args:{id:last.id}}]:[]);
   sfx('alert');
 }
-function incTitle(t){return {ring:'Metro ring cut',site:'Site outage',cut:'Fiber cut',crash:'Router crash',power:'Power outage',transit:'Upstream outage',ixloop:'IX meltdown',leak:'Route leak',ddos:'DDoS attack',fabric:'Fabric outage',depeer:'Peering spat',fatwave:'Fat-fingered wave',label:'Patch panel mishap',mtu:'MTU mismatch',oops:'Oops',cleaner:'Vacuum incident',maxpfx:'Max-prefix meltdown',prepend:'Prepend-ageddon',rpki:'RPKI invalid',amp:'Amplifier failure',roadmff:'Fat-fingered ROADM',optic:'Dead optic',maint:'Maintenance window',ac:'Cooling failure',hijack:'BGP hijack',shutdown:'Government shutdown',redsea:'Geopolitical cable cut'}[t]||'Incident';}
-const LINKCUT_TR=['cut','redsea'],LINKCUT_ID=['fatwave','label'],POPDOWN=['crash','power','oops','cleaner','maint','shutdown'],IXDOWN=['ixloop','maxpfx'],TDOWN=['transit','prepend'],LINKEQ=['mtu','amp','roadmff','optic'];
+function incidentPlace(i){if(isCity(i.ref))return CITY[i.ref].name;if(isIx(i.ref))return ixName(i.ref);const l=S.links.find(l=>l.id===i.ref||(l.trench||l.id)===i.ref);if(l)return CITY[l.a].name+'–'+CITY[l.b].name;const t=S.transit.find(t=>t.id===i.ref);return t?CITY[t.city].name:'';}
+function incTitle(t){return {grid:'Grid power outage',opticmaint:'Optical maintenance',ring:'Metro ring cut',site:'Site outage',cut:'Fiber cut',crash:'Router crash',power:'Power outage',transit:'Upstream outage',ixloop:'IX meltdown',leak:'Route leak',ddos:'DDoS attack',fabric:'Fabric outage',depeer:'Peering spat',fatwave:'Fat-fingered wave',label:'Patch panel mishap',mtu:'MTU mismatch',oops:'Oops',cleaner:'Vacuum incident',maxpfx:'Max-prefix meltdown',prepend:'Prepend-ageddon',rpki:'RPKI invalid',amp:'Amplifier failure',roadmff:'Fat-fingered ROADM',optic:'Dead optic',maint:'Maintenance window',ac:'Cooling failure',hijack:'BGP hijack',shutdown:'Government shutdown',redsea:'Geopolitical cable cut'}[t]||'Incident';}
+const LINKCUT_TR=['cut','redsea'],LINKCUT_ID=['fatwave','label'],POPDOWN=['crash','power','oops','cleaner','maint','shutdown'],IXDOWN=['ixloop','maxpfx'],TDOWN=['transit','prepend'],LINKEQ=['mtu','amp','roadmff','optic','opticmaint'];
 function remainUntil(pred){let u=0;for(const x of S.inc)if(pred(x))u=Math.max(u,x.until);return u;}
 // Remove an incident, then restore each affected thing to whatever other incidents still hold it down.
 function clearInc(i){
@@ -1836,7 +1931,7 @@ function clearInc(i){
   else if(T==='mtu'){const l=S.links.find(x=>x.id===i.ref);if(l)l.deg=remainUntil(x=>x.type==='mtu'&&x.ref===i.ref);}
   else if(T==='ring'){if(S.pops[i.ref])S.pops[i.ref].ringcut=remainUntil(x=>x.type==='ring'&&x.ref===i.ref);}
   else if(T==='ac'){if(S.pops[i.ref])S.pops[i.ref].hot=remainUntil(x=>x.type==='ac'&&x.ref===i.ref);}
-  else if(T==='amp'||T==='roadmff'){const l=S.links.find(x=>x.id===i.ref);if(l)l.eqDown=remainUntil(x=>(x.type==='amp'||x.type==='roadmff')&&x.ref===i.ref);}
+  else if(T==='amp'||T==='roadmff'||T==='opticmaint'){const l=S.links.find(x=>x.id===i.ref);if(l)l.eqDown=remainUntil(x=>(x.type==='amp'||x.type==='roadmff'||x.type==='opticmaint')&&x.ref===i.ref);}
   else if(T==='optic'){const l=S.links.find(x=>x.id===i.ref);if(l&&!S.inc.some(x=>x.type==='optic'&&x.ref===i.ref))l.chFail=null;}
 }
 function purgeInc(){S.inc=S.inc.filter(i=>{const T=i.type;if(LINKCUT_TR.includes(T))return S.links.some(l=>(l.trench||l.id)===i.ref);if(LINKCUT_ID.includes(T)||LINKEQ.includes(T))return S.links.some(l=>l.id===i.ref);if(TDOWN.includes(T))return S.transit.some(t=>t.id===i.ref);if(IXDOWN.includes(T))return S.ixp[i.ref]!==undefined;if(POPDOWN.includes(T)||T==='ac')return !!S.pops[i.ref];return true;});}
@@ -1859,8 +1954,7 @@ function fireEvent(){
   if(e==='landban'){const lc=[...new Set(CABLE_PAIRS.flatMap(c=>[c.a,c.b]))];const c=pick(lc);S.ev.landban={city:c,until:S.day+45};toast(`<b>Landing permit dispute in ${CITY[c].name}</b><br>Two ministries both claim the beach. No new subsea links can land there for 45 days.`,'bad');return;}
   if(e==='shutdown'){const ps=Object.keys(S.pops).filter(c=>c!==S.home);if(!ps.length)return;const c=pick(ps);S.pops[c].down=Math.max(S.pops[c].down||0,S.day+1);addInc({type:'shutdown',ref:c,until:S.day+1,msg:`Regulators ordered every network in ${CITY[c].name} to switch off for a day during national school exams. Yes, this really happens.`,cost:0});toast(`<b>Ordered offline in ${CITY[c].name}</b><br>A government exam-day shutdown. Your POP there is dark for a day.`,'bad');sfx('alert');return;}
   if(e==='typhoon'){const c=pick(['mnl','hkg','tok','icn','sha','jkt'].filter(x=>S.pops[x])),p=S.pops[c],nm=pick(['Typhoon Bandwidth','Typhoon Latency','Typhoon Jitter','Typhoon Packet-Loss']);
-    if(p.gen){S.stats.survived++;toast(`<b>${nm} hits ${CITY[c].name}</b><br>The grid is down, but your backup generator kept the routers running.`,'good');sfx('alert');return;}
-    p.down=Math.max(p.down||0,S.day+2);addInc({type:'power',ref:c,until:p.down,msg:`${nm} knocked out power in ${CITY[c].name}. Your POP has no generator.`,cost:7000,fix:'Rent a generator'});toast(`<b>${nm} hits ${CITY[c].name}</b><br>Power is out and your POP is dark for two days. A generator would have saved it.`,'bad');sfx('alert');compute();return;}
+    gridOutage(c,2,{regional:true,message:`${nm} knocked out the regional grid.`});compute();return;}
   if(e==='runet'){S.ev.runet=S.day+1;toast('<b>Sovereign internet drill</b><br>Moscow unplugged itself from the rest of the internet for a day to see what happens. Everything leaving Russia is dark until tomorrow.','bad');sfx('alert');compute();return;}
   if(e==='baltic'){const BAL=['clion','havf','danice'];const hit=S.links.filter(l=>l.cable&&BAL.includes(l.cable)&&!(l.cut>S.day));
     if(!hit.length){toast('<b>Baltic cable damaged</b><br>A cargo ship dragged its anchor for 100 km and swears it noticed nothing. You have no links on those cables.','goal');return;}
@@ -1884,6 +1978,7 @@ function dayTick(){
   if(!S||S.lost)return;
   S.day++;
   const d=S.day;
+  operationsTick();
   dkTick(d);ixPriceWar(d);
   if(!S.phpDone&&d>45&&Math.random()<1/400)elephant();
   if(R&&R.teMoved)S.stats.teMax=Math.max(S.stats.teMax||0,R.teMoved);
@@ -1893,7 +1988,7 @@ function dayTick(){
     toast(`<b>${esc(NET[id].name)} de-peered you in ${esc(CITY[ixCity(c)].name)}.</b><br>${esc(sn.why)} Traffic falls back to your next best path.`,'bad');}
   if(S.cnLic&&S.cnLic.state==='pending'&&d>=S.cnLic.ready){S.cnLic.state='ok';toast('<b>License granted!</b><br>Your joint venture can now build POPs in mainland China.','goal');sfx('coin');}
   // resolve incidents
-  for(const i of S.inc.slice())if(i.until<=d){clearInc(i);toast(`<b>Resolved:</b> ${incTitle(i.type).toLowerCase()} is fixed.`,'good');}
+  for(const i of S.inc.slice())if(i.until<=d){clearInc(i);toast(`<b>Resolved:</b> ${incTitle(i.type).toLowerCase()}${incidentPlace(i)?' in '+esc(incidentPlace(i)):''} is fixed.`,'good');}
   // eyeball growth / churn uses last computed service
   for(const c in S.pops){const p=S.pops[c];if(!p.bb)continue;const sf=sfOf(R,c),P=CITY[c].P;
     if(sf>=0.9){const g=0.025*(scnRule('boom')?1.5:1)*(p.boost>d?2:1)*sf*(0.7+0.6*(R.peerShare||0))*(CITY[c].reg==='AS'&&!CITY[c].cn?1.6:1);p.bb.d+=g*p.bb.d*(1-p.bb.d/P);}
@@ -1908,15 +2003,16 @@ function dayTick(){
     if(l.ready===d){toast(`<b>${l.own?'Your fiber is finished':'Dark fiber handed over'}: ${CITY[l.a].name}–${CITY[l.b].name}</b><br>${(l.ch||[]).length?'Channels are lighting up now.':'It is dark. Add optics to light it up.'}`,'goal',[{l:'Open',act:'selLink',args:{id:l.id}}]);sfx('coin');}
     if(l.own&&l.ready>d&&Math.random()<0.012){const extra=10+Math.floor(Math.random()*40);l.ready+=extra;toast(`<b>Construction delay: +${extra} days</b><br>${pick(['Archaeologists found a Roman bathhouse on your route.','A protected hamster species lives along the right-of-way.','The railway changed its mind about the easement.','The drilling crew hit a granite boulder the size of a bus.','A town council wants a public hearing. About the color of the manhole covers.','Somebody else’s gas main was exactly where the map said it was not.','The permit office lost your permit. And then the replacement.'])} (${CITY[l.a].name}–${CITY[l.b].name})`,'bad');}}
   // businesses mood
-  for(const b of S.biz.slice()){if(eventTick(b,d))continue;const oldMood=b.mood,sf=bizSf(b),reachOk=BIZ_T[b.type].l2||BIZ_T[b.type].fiber||R.reach>0.99,scrubOk=b.type!=='scrub'||!!S.scrubAt,divOk=reqOk(b);
+  for(const b of S.biz.slice()){if(eventTick(b,d))continue;const oldMood=b.mood,sf=bizSf(b),reachOk=BIZ_T[b.type].l2||BIZ_T[b.type].fiber||R.reach>0.99,scrubOk=b.type!=='scrub'||scrubFraction(b.city)>=.95,divOk=reqOk(b);
     if(sf>=0.95&&reachOk&&scrubOk&&divOk)b.mood=Math.min(100,b.mood+2);
     else if(S.day-(b.since||0)<15){}
-    else{b.mood-=(Math.max(0,0.95-sf)*45+(!reachOk?3:0)+(!scrubOk?4:0)+(!divOk?3:0));
+    else{b.mood-=(Math.max(0,0.95-sf)*45+(!reachOk?3:0)+(!scrubOk?4:0)+(!divOk?3:0))*(S.inc.some(i=>i.type==='maint'&&i.ref===b.city&&i.until>S.day)?.25:1);
       if(oldMood>=30&&b.mood<1)b.mood=1;
       if(b.mood<=0){S.biz=S.biz.filter(x=>x!==b);toast(`<b>${esc(b.name)} cancelled.</b><br>Too many outages and too little bandwidth in ${CITY[b.city].name}.`,'bad');sfx('err');}
       else if(b.mood<30&&!b.warned){b.warned=true;if(UI.autoPause!==false){UI.speed=0;acc=0;}toast(`<b>${esc(b.name)} is furious.</b><br>Fix service in ${CITY[b.city].name} or they leave.`,'bad',[{l:'Show me',act:'focusCity',args:{city:b.city}}]);}}
     if(b.mood<60&&oldMood>=60)toast(`<b>${esc(b.name)} is unhappy.</b><br>Satisfaction is ${Math.max(0,Math.round(b.mood))}%. Fix service before the cancellation email arrives.`,'bad',[{l:'Customers',act:'customers',args:{}}]);
     if(b.mood>60)b.warned=false;}
+  hostingTick();
   // own IX members join
   for(const c in S.myIx){const m=S.myIx[c];if(d>=m.next&&m.members.length<myFab(c).max){
     const cands=NETS.filter(n=>n.type!=='t1'&&!m.members.includes(n.id)&&(n.pops.includes(c)||n.pops.some(p=>CITY[p].reg===CITY[c].reg)));
@@ -2049,6 +2145,17 @@ function checkGoals(){checkBadges();
 /* ================= ACTIONS ================= */
 function spend(c){if(S.cash<c){toast('<b>Not enough cash.</b><br>Wait for revenue, or speed up time.','bad');sfx('err');return false;}S.cash-=c;sfx('build');return true;}
 const ACT={
+ eventLog:()=>{UI.dashView='log';$('dash').hidden=false;renderDash();},
+ logFilter:({v})=>{if(!own(LOG_CATS,v))return;UI.logCat=v;renderDash();},
+ logSearch:()=>{UI.logQuery=($('logQuery')?.value||'').slice(0,100);renderDash();},
+ opsCity:({city})=>{if(!isCity(city))return;closeModal();$('dash').hidden=true;ACT.focusCity({city});UI.tab='links';renderPanel();},
+ hostingCity:({city})=>{if(!isCity(city))return;closeModal();$('dash').hidden=true;ACT.focusCity({city});UI.tab='hosting';renderPanel();},
+ powerBuy:({city,item})=>{const p=S.pops[city];if(!isCity(city)||!p||!['ups','dualFeed'].includes(item)||p[item])return;const cost=item==='ups'?UPS_COST:FEED_COST;if(!spend(cost))return;p[item]=true;if(item==='dualFeed'&&p.gridUntil>S.day&&!p.gridRegional){p.gridUntil=S.day;for(const i of S.inc.slice())if(i.type==='grid'&&i.ref===city)clearInc(i);}if(item==='ups'&&p.gridUntil>S.day){p.upsUntil=S.day+1;p.upsReady=p.gridUntil+1;}recordEvent(`${CITY[city].name}: ${item==='ups'?'UPS installed':'second grid feed connected'}.`,'good','power',city);after();},
+ rackBuy:({city})=>{const p=S.pops[city];if(!isCity(city)||!p)return;const d=dcOf(city);if(d.racks>=MAX_RACKS||!portGate(city,1)||!spend(RACK_COST))return;if(!p.dc)p.dc={...DC_EMPTY};p.dc.racks++;recordEvent(`${CITY[city].name}: rack ${p.dc.racks} opened. Twenty units, zero cable management.`,'good','hosting',city);after();},
+ coloRelease:({city})=>{const p=S.pops[city];if(!p?.dc?.tenants)return;if(UI.confirm!=='colo'+city){UI.confirm='colo'+city;renderPanel();return;}UI.confirm=null;p.dc.tenants--;recordEvent(`${CITY[city].name}: one colocation lease ended to reclaim 1U of rack space.`,'','hosting',city);after();},
+ serverBuy:({city,role})=>{const p=S.pops[city];if(!isCity(city)||!p||!own(SERVER_ROLE,role))return;const d=dcOf(city),T=SERVER_ROLE[role];if(dcFree(d)<1||!spend(T.cost))return;p.dc[role]++;if(p.serverDue===undefined)p.serverDue=S.day+60;recordEvent(`${CITY[city].name}: ${T.l} server installed.`,'good','hosting',city);after();},
+ serverRemove:({city,role})=>{const p=S.pops[city];if(!isCity(city)||!p||!own(SERVER_ROLE,role)||!p.dc||!p.dc[role])return;if(UI.confirm!==city+role){UI.confirm=city+role;renderPanel();return;}UI.confirm=null;p.dc[role]--;const T=SERVER_ROLE[role];if(T.clients)p.dc[role+'Clients']=Math.min(p.dc[role+'Clients'],p.dc[role]*T.clients);recordEvent(`${CITY[city].name}: ${T.l} server removed; any excess service accounts were closed.`,'','hosting',city);after();},
+
  speed:({v})=>{v=+v;if(![0,0.5,1,2,4,8].includes(v))return;UI.speed=v;renderHUD();},
  help:()=>showHelp(),
  customerNoc:()=>{UI.dashView="noc";UI._dh=null;renderDash();},
@@ -2180,7 +2287,7 @@ const ACT={
  goEgress:({city,k})=>{ACT.focusCity({city});UI.tab=k==='t'?'up':k==='l2'?'cust':'peer';renderPanel();},
  applyCn:()=>{if(S.cnLic.state!=='none')return;if(!spend(CN_LIC))return;S.cnLic={state:'pending',ready:S.day+45};toast('<b>Application filed.</b><br>Your local partner says about 45 days. Probably.','goal');after();},
  togglePrem:({id})=>{const t=S.transit.find(x=>x.id===id);if(!t)return;t.premium=!t.premium;sfx('click');after();},
- scrub:({city})=>{if(S.scrubAt){if(UI.confirm!=='scrub'){UI.confirm='scrub';renderAll();return;}S.scrubAt=null;UI.confirm=null;after();return;}if(!spend(SCRUB_COST))return;S.scrubAt=city;toast(`<b>Scrubbing center online in ${CITY[city].name}.</b><br>DDoS attacks are now absorbed, and you can sell DDoS protection to businesses.`,'good');after();},
+ scrub:({city})=>{if(S.scrubAt){if(UI.confirm!=='scrub'){UI.confirm='scrub';renderAll();return;}S.scrubAt=null;UI.confirm=null;after();return;}if(!spend(SCRUB_COST))return;S.scrubAt=city;toast(`<b>Scrubbing center online in ${CITY[city].name}.</b><br>400 Gbps of cleaning capacity is available while this POP is powered and reachable. Expand with servers in the Hosting tab.`,'good');after();},
  cnPrem:({v})=>{UI.cnPrem=!!+v;if(UI.pending)openLinkModal(UI.pending.a,UI.pending.b);},
  via:({v})=>{UI.via=v;if(UI.pending)openLinkModal(UI.pending.a,UI.pending.b);},
  setRoute:({id,m})=>{if(!own(RT,m))return;const b=S.biz.find(x=>x.id===id);if(b){b.route=m;sfx('click');after();}},
@@ -2190,8 +2297,8 @@ const ACT={
  models:()=>{UI.models=!UI.models;renderPanel();},
  rmRouter:({city})=>{const p=S.pops[city];if(!p||(p.routers||1)<=1)return;if(portsUsed(city)>portsMax(city,undefined,p.routers-1)){toast(`<b>Unplug something first.</b><br>${fmtPorts(portsUsed(city))} ports are in use, and one router fewer only has ${portsMax(city,undefined,p.routers-1)}.`,'bad');sfx('err');return;}p.routers--;after();},
  upRouter:({city,g})=>{const p=S.pops[city];if(!p)return;g=g===undefined?RG[p.rgen||0].cls+1:+g;if(!RG[g]||g===(p.rgen||0))return;{const why=modelFits(city,g);if(why){toast(`<b>The ${esc(RG[g].n)} won't fit.</b><br>${esc(why)}`,'bad');sfx('err');return;}}if(RG[g].lvl>lvl()){toast(`<b>${esc(RG[g].n)} unlocks at customer level ${RG[g].lvl}.</b>`,'bad');sfx('err');return;}
-   const rt=p.routers||1;if(!spend(RG[g].cost*rt))return;p.rgen=g;
-   if(rt===1){const sl=slowBoot(city),dd=sl?3:1;p.down=Math.max(p.down||0,S.day+dd);addInc({type:'maint',ref:city,until:S.day+dd,msg:sl?`Swapping the only router in ${CITY[city].name} for a ${RG[g].n}. The new one ${pick(SLOW_BOOT)}. Back in ${dd} days.`:`Swapping the only router in ${CITY[city].name} for a ${RG[g].n}. Maintenance window: back tomorrow.`,cost:0});toast(`<b>Maintenance window in ${CITY[city].name}</b><br>${sl?`One router, and this one takes forever to boot. Back in ${dd} days.`:'One router means downtime during the swap. Back tomorrow.'}`,'bad');}
+   const rt=p.routers||1;if(!spend(RG[g].cost*rt))return;p.rgen=g;p.routerDue=S.day+90;
+   if(rt-(p.rdown>S.day?1:0)<2&&S.mode!=='sandbox'){const sl=slowBoot(city),dd=sl?3:1;p.down=Math.max(p.down||0,S.day+dd);addInc({type:'maint',ref:city,until:S.day+dd,msg:sl?`Swapping the only router in ${CITY[city].name} for a ${RG[g].n}. The new one ${pick(SLOW_BOOT)}. Back in ${dd} days.`:`Swapping the only router in ${CITY[city].name} for a ${RG[g].n}. Maintenance window: back tomorrow.`,cost:0});toast(`<b>Maintenance window in ${CITY[city].name}</b><br>${sl?`One router, and this one takes forever to boot. Back in ${dd} days.`:'One router means downtime during the swap. Back tomorrow.'}`,'bad');}
    else toast(`<b>Rolling upgrade in ${CITY[city].name}</b><br>${rt} × ${esc(RG[g].n)}, swapped one at a time. Zero downtime.`,'good');
    floater(CITY[city].x,CITY[city].y-30,RG[g].n+'!','#FF4F9A');after();},
  dfMode:({m})=>{UI.lmode=m;if(UI.pending)openLinkModal(UI.pending.a,UI.pending.b);},
@@ -2210,7 +2317,7 @@ const ACT={
  upSys:({id})=>{const l=S.links.find(x=>x.id===id);if(!l||l.sys==='roadm'||lvl()<3)return;if(!spend(DF_SYS.roadm.cost))return;l.sys='roadm';if(l.ready<=S.day){l.eqDown=S.day+1;toast('<b>Line system swap</b><br>All channels are dark for a day while the ROADMs go in.','bad');}after();},
  spares:({id})=>{const l=S.links.find(x=>x.id===id);if(!l)return;l.spares=!l.spares;sfx('click');after();},
  crews:({id})=>{const l=S.links.find(x=>x.id===id);if(!l||l.ready<=S.day)return;const c=Math.round(15000+l.km*6);if(!spend(c))return;l.ready=Math.max(S.day+1,l.ready-30);toast('<b>More crews on site.</b><br>Construction is 30 days ahead.','good');after();},
- addGen:({city})=>{const p=S.pops[city];if(!p||p.gen)return;if(!spend(GEN_COST))return;p.gen=true;floater(CITY[city].x,CITY[city].y-30,'Generator!','#FF8A3D');after();},
+ addGen:({city})=>{const p=S.pops[city];if(!p||p.gen)return;if(!spend(GEN_COST))return;p.gen=true;p.generatorDue=S.day+180;recordEvent(`${CITY[city].name}: backup generator commissioned.`,'good','power',city);floater(CITY[city].x,CITY[city].y-30,'Generator!','#FF8A3D');after();},
  start:()=>{const nm=(($('nmIn')&&$('nmIn').value)||'Packet Pals').slice(0,24);beginGame(nm,UI.startCity,{mode:UI.mode==='sandbox'?'sandbox':'normal'});},
  modeSet:({m})=>{UI.mode=m;document.querySelectorAll('.modeb').forEach(b=>b.classList.toggle('pink',b.dataset.m===m));document.querySelectorAll('.modeb').forEach(b=>b.classList.toggle('ghost',b.dataset.m!==m));},
  scenarios:()=>{UI.nm=(($('nmIn')&&$('nmIn').value)||UI.nm||(S&&S.name)||'Packet Pals').slice(0,24);scenarioModal();},
@@ -2307,7 +2414,7 @@ function renderHUD(){
   $('hTrafBar').style.width=(R.demand?R.served/R.demand*100:0)+'%';
   $('hTrafBar').style.background=R.demand&&R.served/R.demand<0.9?'var(--bad)':'var(--ok)';
   $('hReach').textContent=pct(R.reach);$('hReach').style.color=R.reach<0.99?'var(--bad)':'var(--eye)';
-  const moods=S.biz.filter(b=>!BIZ_T[b.type].event);const mood=moods.length?moods.reduce((v,b)=>v+b.mood,0)/moods.length:null;const hm=$('hMood');hm.textContent=mood===null?'—':Math.round(mood)+'%';hm.style.color=moods.some(b=>b.mood<30)?'var(--bad)':mood!==null&&mood<60?'var(--wave)':'var(--eye)';hm.title=moods.length+' customers · '+moods.filter(b=>b.mood<30).length+' furious';
+  const moods=S.biz.filter(b=>!BIZ_T[b.type].event),hs=hostingSummary(),count=moods.length+hs.count,mood=count?(moods.reduce((v,b)=>v+b.mood,0)+hs.sum)/count:null,furious=moods.filter(b=>b.mood<30).length+hs.furious,hm=$('hMood');hm.textContent=mood===null?'—':Math.round(mood)+'%';hm.style.color=furious?'var(--bad)':mood!==null&&mood<60?'var(--wave)':'var(--eye)';hm.title=count+' customers · '+furious+' furious';
   $('hTier').textContent=tierLabel();
   $('hDate').textContent=dateStr(S.day);
   {const bo=(S.loanOffers||[]).length,hb=$('hBank');hb.hidden=!bo;hb.textContent=bo;}
@@ -2336,7 +2443,7 @@ function renderLeft(){
   }else if(UI.left==='noc'){
     h+=`<div class="btns" style="margin-bottom:8px">${btn('Open NOC dashboard','dash',{},'pink')}${btn('Traceroute','trace',{},'')}</div>`;
     h+=`<p class="lead">Your Network Operations Center. Every notification also lands here. Things fail all the time on the internet. Redundant links and multiple upstreams let traffic reroute by itself.</p>`;
-    h+=`<div class="kv"><span>DDoS scrubbing</span><b>${S.scrubAt?'On · '+CITY[S.scrubAt].name:'None (build one from a POP\'s Infra tab)'}</b></div>`;
+    h+=`<div class="kv"><span>DDoS scrubbing</span><b>${fmtG(scrubCapacity())} active · expand from a POP's Hosting tab</b></div>`;
     h+=S.te?`<div class="kv"><span>Auto-TE</span><b>${S.te.on?`On · moving ${fmtG(R.teMoved||0)} onto alternate paths`:'Off'}</b></div><div class="btns">${btn(S.te.on?'Turn Auto-TE off':'Turn Auto-TE on','teToggle',{},'ghost sm')}${btn(S.te.script?'Edit RouteScript':'Write a RouteScript','teEdit',{},'pink sm')}</div>${S.te.script?`<p class="meta" style="margin:2px 0 6px">RouteScript: ${teRules()?teRules().n+' rules live':S.te.on?'has errors, not running':'controller off'}${R.teBlack?` · blackholing ${fmtG(R.teBlack)}`:''}</p>`:''}`
       :`<div class="kv"><span>Auto-TE</span><b>${lvl()<3?'Unlocks at customer level 3':'Not installed'}</b></div><p class="meta" style="margin:2px 0 6px">Traffic takes the shortest path, even when it is full. A traffic-engineering controller spills the overflow onto the next-best paths with room.</p><div class="btns">${btn(`Install Auto-TE <small>${fmt$(TE_COST)} + ${fmt$(TE_MO)}/mo</small>`,'buyTE',{},'pink sm',lvl()<3||S.cash<TE_COST)}</div>`;
     const hot=S.links.filter(l=>!linkDown(l)&&capOf(l)>0&&(R.load[l.id]||0)/capOf(l)>=0.85).sort((a,b)=>(R.load[b.id]/capOf(b))-(R.load[a.id]/capOf(a)));
@@ -2345,7 +2452,7 @@ function renderLeft(){
     if(hotR.length)h+=`<h3 style="font-size:15px;margin:4px 0">Ports, caches and routers running hot</h3>`+hotR.map(x=>`<div class="row"><span class="hotk hk-${x.k}">${HOTL[x.k]}</span><div class="grow"><div class="nm">${CITY[x.city].name} · ${esc(x.lab)}</div><div class="meta">${pct(Math.min(1,x.u))} full${x.u>=0.995?' · dropping or overflowing':''} · ${esc(x.tip)}</div></div>${btn('Inspect','focusCity',{city:x.city},'pink sm')}</div>`).join('');
     if(!S.inc.length&&!hot.length&&!hotR.length)h+=`<p class="empty">All systems green. Enjoy it while it lasts.</p>`;
     for(const i of S.inc){h+=`<div class="inc"><div class="nm">${incTitle(i.type)}</div><div class="meta">${esc(i.msg)}</div><div class="meta">Auto-fix in ${i.until-S.day} day${i.until-S.day===1?'':'s'}${i.impact?` · ${fmtG(i.impact)} lost`:''}</div>${i.cost?`<div class="btns">${btn(`${esc(i.fix||'Rush repair')} ${fmt$(i.cost)}`,'fixInc',{id:i.id},'red sm',S.cash<i.cost)}</div>`:''}</div>`;}
-    if(S.log&&S.log.length){h+=`<h3 style="font-size:15px;margin:12px 0 4px">Recent events</h3>`+S.log.slice(0,15).map(e=>`<div class="row"><div class="grow"><div class="meta"><b class="tag ${e.k==='bad'?'restrictive':e.k==='good'?'open':'st'}">${dateStr(e.d)}</b> ${esc(e.t)}</div></div></div>`).join('');}
+    if(S.log&&S.log.length){h+=`<h3 style="font-size:15px;margin:12px 0 4px">Recent events</h3>${btn('Full event log','eventLog',{},'ghost sm')}`+S.log.slice(0,15).map(e=>`<div class="row"><div class="grow"><div class="meta"><b class="tag ${e.k==='bad'?'restrictive':e.k==='good'?'open':'st'}">${dateStr(e.d)}</b> ${esc(e.t)}</div></div></div>`).join('');}
     h+=`<div class="kv" style="margin-top:8px"><span>Incidents so far</span><b>${S.stats.incidents}</b></div><div class="kv"><span>Survived with no impact</span><b>${S.stats.survived}</b></div>`;
   }else{
     h+=`<p class="lead">Every network on the map. Traffic share is how much of your users' traffic goes to them.</p>`;
@@ -2365,7 +2472,7 @@ function renderPanel(){
   const ns=$('panelBody').querySelector('.scroll');if(ns)ns.scrollTop=st;
 }
 function cityPanel(c){
-  const C=CITY[c],p=S.pops[c],ix=ixName(c),down=p&&p.down>S.day;
+  const C=CITY[c],p=S.pops[c],ix=ixName(c),down=p&&!popUp(c);
   let h=`<div class="ph"><div style="min-width:0"><div class="eyebrow">${REG[C.reg]} · ${esc(C.dc)}</div><h2>${C.name}</h2>
   <div class="facts"><span class="fact">${fmtG(C.P)} of eyeballs</span>${regionMult(c)>1?`<span class="fact">Transit ${regionMult(c)}× pricier</span>`:''}${C.reg==='AS'&&!C.cn?'<span class="fact ixf">Underserved: users grow 60% faster</span>':''}${ix?`<span class="fact ixf">IX: <b>${esc(ix)}</b></span>`:''}${p?`<span class="fact mine">Your POP</span><button class="fact trb" data-act="trace" data-args='{"city":"${c}"}'>🔍 Traceroute</button>`:''}${down?`<span class="fact down">DOWN</span>`:''}</div></div>
   <button class="x" data-act="closePanel" aria-label="Close">×</button></div>`;
@@ -2382,11 +2489,11 @@ function cityPanel(c){
     h+=`<section><h3>Who's here</h3><div class="meta" style="font-size:12.5px;line-height:1.6">${MEGA.filter(m=>m.c===c).length?`AI and cloud campuses nearby: ${MEGA.filter(m=>m.c===c).map(m=>`<b>${esc(m.n)}</b>`).join(', ')}<br>`:''}Transit sellers: ${tr.map(n=>`<b>${esc(n.name)}</b>`).join(', ')||'none'}<br>Fabrics: ${fh.map(f=>`<b>${esc(f.name)}</b>`).join(', ')||'none'}<br>${ix?ixIdsIn(c).map(x=>`IX members on ${esc(ixName(x))}: ${ixMembers(x).length}`).join('<br>'):'No IX here yet. You could found one later.'}</div></section></div>`;
     return h;
   }
-  const tabs=[['cust','Customers'],['up','Transit'],['peer','Peering'],['links','Infra']];
+  const tabs=[['cust','Customers'],['up','Transit'],['peer','Peering'],['links','Infra'],['hosting','Hosting']];
   h+=`<nav class="tabs">${tabs.map(([k,l])=>`<button class="${UI.tab===k?'on':''}" data-act="tab" data-args='{"t":"${k}"}'>${l}</button>`).join('')}</nav><div class="scroll">`;
   if(C.cn&&UI.tab==='cust')h+=chinaSection(c);
   const sf=sfOf(R,c),dem=R.cityDem[c]||0;
-  if(down){const i=S.inc.filter(x=>x.ref===c&&POPDOWN.includes(x.type)).sort((a,b)=>b.until-a.until)[0];h+=`<section><h3 style="color:var(--bad)">This POP is down</h3><p class="lead">${i?esc(i.msg):''} Customers here get nothing until it's back.</p>${i&&i.cost?btn(`${i.fix} ${fmt$(i.cost)}`,'fixInc',{id:i.id},'red'):''}</section>`;}
+  if(down){const i=S.inc.filter(x=>x.ref===c&&(POPDOWN.includes(x.type)||x.type==='grid')).sort((a,b)=>b.until-a.until)[0];h+=`<section><h3 style="color:var(--bad)">This POP is down</h3><p class="lead">${i?esc(i.msg):''} Customers here get nothing until it's back.</p>${i&&i.cost?btn(`${i.fix} ${fmt$(i.cost)}`,'fixInc',{id:i.id},'red'):''}</section>`;}
   if(UI.tab==='cust'){
     {const nl=R.nodeLoad[c]||0,nc=R.nodeCap[c]||1;if(nl>=nc*0.95)h+=`<section><h3 style="color:var(--bad)">Router maxed out</h3><p class="lead">Your routers here are forwarding ${fmtG(nl)} of ${fmtG(nc)}. Traffic is being dropped. Upgrade or add a router in the Infra tab.</p>${btn('Open Infra','tab',{t:'links'},'pink sm')}</section>`;}
     h+=`<section><h3>Home broadband</h3>`;
@@ -2401,7 +2508,7 @@ function cityPanel(c){
     h+=`</section><section><h3>Business customers</h3>`;
     const bz=S.biz.filter(b=>bCities(b).includes(c));
     if(!bz.length)h+=`<p class="empty">No businesses yet. Offers pop up as $ bubbles on the map.</p>`;
-    for(const b of bz)h+=`<div class="row"><div class="grow"><div class="nm">${esc(b.name)}</div><div class="meta">${esc(BIZ_T[b.type].l)}${b.city2?` ${CITY[b.city].name} ⇄ ${CITY[b.city2].name}`:''} · ${bTerms(b)}${BIZ_T[b.type].l2?` · carrying ${fmtG(R.l2[b.id]||0)}${b.sites?' per site':''}`:''}${BIZ_T[b.type].fiber&&!fiberOk(b)?' · <b style="color:var(--bad)">fiber is down</b>':''}${BIZ_T[b.type].event&&eventLive(b)?` · <b>serving ${pct(sfOf(R,b.city))}</b>`:''}${b.type==='scrub'&&!S.scrubAt?' · <b style="color:var(--bad)">needs a scrubbing center</b>':''}${S.day-(b.since||0)<15?` · <b>provisioning, ${15-(S.day-(b.since||0))}d grace</b>`:''}</div>${reqList(b)}${BIZ_T[b.type].l2?routeCtl(b):''}<div class="bar ${b.mood<30?'bad':b.mood<65?'warn':''}"><i style="width:${b.mood}%"></i></div><div class="meta">Happiness ${Math.round(b.mood)}%</div></div>${btn(UI.confirm===b.id?'Really drop?':'Drop','dropBiz',{id:b.id},'ghost sm')}</div>`;
+    for(const b of bz)h+=`<div class="row"><div class="grow"><div class="nm">${esc(b.name)}</div><div class="meta">${esc(BIZ_T[b.type].l)}${b.city2?` ${CITY[b.city].name} ⇄ ${CITY[b.city2].name}`:''} · ${bTerms(b)}${BIZ_T[b.type].l2?` · carrying ${fmtG(R.l2[b.id]||0)}${b.sites?' per site':''}`:''}${BIZ_T[b.type].fiber&&!fiberOk(b)?' · <b style="color:var(--bad)">fiber is down</b>':''}${BIZ_T[b.type].event&&eventLive(b)?` · <b>serving ${pct(sfOf(R,b.city))}</b>`:''}${b.type==='scrub'&&scrubFraction(b.city)<.95?' · <b style="color:var(--bad)">needs more reachable scrubbing capacity</b>':''}${S.day-(b.since||0)<15?` · <b>provisioning, ${15-(S.day-(b.since||0))}d grace</b>`:''}</div>${reqList(b)}${BIZ_T[b.type].l2?routeCtl(b):''}<div class="bar ${b.mood<30?'bad':b.mood<65?'warn':''}"><i style="width:${b.mood}%"></i></div><div class="meta">Happiness ${Math.round(b.mood)}%</div></div>${btn(UI.confirm===b.id?'Really drop?':'Drop','dropBiz',{id:b.id},'ghost sm')}</div>`;
     h+=`</section>`+offersHere(c);
   }else if(UI.tab==='up'){
     h+=portNote(c);
@@ -2431,6 +2538,7 @@ function cityPanel(c){
       h+=`<div class="row">${logo(n)}<div class="grow"><div class="nm">${esc(n.cache.name)}</div><div class="meta">from ${esc(n.name)} · ${have.length?`${have.length} box${have.length>1?'es':''} · serving ${fmtG(have.reduce((a,x)=>a+(R.useCache[x.id]||0),0))}`:`100G per box`}</div>${!ok?`<div class="why">Needs ${n.cache.min} Gbps of traffic to ${esc(n.name)} (now ${dem.toFixed(1)})</div>`:''}</div>
       ${have.length?btn('Remove','rmCache',{id:have[0].id},'ghost sm'):''}${have.length<4?btn(have.length?'+ box':'Request','cache',{city:c,net:n.id},'sm',!ok):''}</div>`;}
     h+=`</section>`;
+  }else if(UI.tab==='hosting'){h+=hostingSection(c);
   }else{
     const ls=S.links.filter(l=>l.a===c||l.b===c);
     const rt=p.routers||1,g=p.rgen||0,G=RG[g],nl=R.nodeLoad[c]||0,nc=R.nodeCap[c]||nodeCap(c),N=g===G.cls?RG[G.cls+1]:null,Ni=N?G.cls+1:-1,pu=portsUsed(c),pm=portsMax(c);
@@ -2448,8 +2556,8 @@ function cityPanel(c){
       const row=s=>{const dn=siteDown(c,s),u=up(s);return `<div class="row"><span class="logo" style="--c:${s==='a'?'#FF4F9A':'#7B61FF'}">${s.toUpperCase()}</span><div class="grow"><div class="nm">${esc(siteName(c,s))}${dn?' <span class="tag restrictive">DOWN</span>':''}</div><div class="meta">${u.length?esc(u.join(', ')):'Nothing plugged in here yet'}</div></div></div>`;};
       return `<p class="lead">Two buildings joined by your own metro ring. A power cut or cleaner in one leaves the other running at half capacity. Uplinks only work while their site is up, unless you split them: choose <b>Both</b> on a port to put LAG members in each building.</p>${row('a')}${row('b')}${up('b').length&&up('a').length?'':`<p class="why">Everything is in one building. Move some uplinks to the other site from the Transit and Peering tabs.</p>`}<div class="kv"><span>Second site and metro ring</span><b>${fmt$(SITE2_MO)}/mo</b></div><div class="btns">${btn(UI.confirm==='site'+c?'Really close it?':'Close site B','rmSite',{city:c},'ghost sm')}</div>`;})()
     :`<p class="lead">Right now ${esc(CITY[c].name)} is one building. A power cut, an A/C failure or a cleaner with a vacuum takes the whole city dark, and a second router does not help with that. A second data center across town, joined by your own metro ring, keeps half the POP up.</p><div class="btns">${btn(`Add a second site <small>${fmt$(SITE2_COST)} + ${fmt$(SITE2_MO)}/mo</small>`,'addSite',{city:c},'pink',S.cash<SITE2_COST)}</div>`}</section>
-    <section><h3>Power</h3><div class="kv"><span>Backup generator</span><b>${p.gen?'Installed':'None'}</b></div>${p.gen?'<p class="note">Power cuts are covered.</p>':`<div class="btns">${btn(`Install generator <small>${fmt$(GEN_COST)} + ${fmt$(GEN_MO)}/mo</small>`,'addGen',{city:c},'',S.cash<GEN_COST)}</div>`}</section>`;
-    h+=`<section><h3>DDoS scrubbing center</h3>${S.scrubAt===c?`<p class="lead">Online here. Attack traffic anywhere on your network is cleaned before it hurts, and you can sell DDoS protection to businesses.</p>${btn(UI.confirm==='scrub'?'Really shut it down?':'Shut down','scrub',{city:c},'ghost sm')}`:S.scrubAt?`<p class="lead">You already run one in ${CITY[S.scrubAt].name}.</p>`:`<p class="lead">Absorbs DDoS attacks for your whole network and unlocks DDoS protection contracts for businesses.</p>${btn(`Build scrubbing center <small>${fmt$(SCRUB_COST)} + ${fmt$(SCRUB_MO)}/mo</small>`,'scrub',{city:c},'',S.cash<SCRUB_COST)}`}</section>`;
+    ${powerSection(c)}`;
+    h+=`<section><h3>DDoS protection</h3><div class="kv"><span>Reachable cleaning capacity here</span><b>${fmtG(scrubCapacity(c))}</b></div><p class="lead">Cleaning needs powered servers and a live backbone path to the attacked city. Excess attack traffic still reaches your routers. Protection contracts share this capacity.</p>${S.scrubAt===c?`<p class="note">400G scrubbing appliance installed here.</p>${btn(UI.confirm==='scrub'?'Really shut it down?':'Shut down appliance','scrub',{city:c},'ghost sm')}`:S.scrubAt?`<p class="note">400G appliance in ${CITY[S.scrubAt].name}. Expand with servers here or at another POP.</p>`:btn(`Install 400G appliance <small>${fmt$(SCRUB_COST)} + ${fmt$(SCRUB_MO)}/mo</small>`,'scrub',{city:c},'sm',S.cash<SCRUB_COST)}<div class="btns">${btn('Expand with scrubbing servers','tab',{t:'hosting'},'pink sm')}</div></section>`;
     const fabs=FABS.filter(f=>f.cities.includes(c));
     if(fabs.length){h+=`<section><h3>Interconnection fabrics (NNI)</h3><p class="lead">Buy a port on a fabric, then order virtual circuits to your other POPs or to a remote IX. Fast and flexible, but you share their fabric.</p>`;
       for(const f of fabs){const pt=nniPort(c,f.id),used=nniUsed(c,f.id);
@@ -2544,7 +2652,7 @@ function dfPanel(l){
 }
 function offersHere(c){
   const os=S.offers.filter(o=>bCities(o).includes(c));if(!os.length)return '';
-  return `<section><h3>Offers here</h3>${os.map(o=>`<div class="row"><div class="grow"><div class="nm">${esc(o.name)}</div><div class="meta">${esc(BIZ_T[o.type].l)}${o.city2?` ${CITY[o.city].name} ⇄ ${CITY[o.city2].name}`:''} · ${bTerms(o)} · ${o.exp-S.day}d left</div>${R.reach<0.99&&!BIZ_T[o.type].l2?`<div class="why">They need the full internet. Your reach is ${pct(R.reach)}.</div>`:''}${o.type==='scrub'&&!S.scrubAt?`<div class="why">Needs your own scrubbing center (Infra tab).</div>`:''}${reqList(o)}${bHas(o)?'':`<div class="why">Needs a POP in ${bCities(o).filter(x=>!S.pops[x]).map(x=>CITY[x].name).join(', ')} too.</div>`}</div>${bHas(o)?btn('Accept','accept',{id:o.id},'green sm'):''}${btn('No','decline',{id:o.id},'ghost sm')}</div>`).join('')}</section>`;
+  return `<section><h3>Offers here</h3>${os.map(o=>`<div class="row"><div class="grow"><div class="nm">${esc(o.name)}</div><div class="meta">${esc(BIZ_T[o.type].l)}${o.city2?` ${CITY[o.city].name} ⇄ ${CITY[o.city2].name}`:''} · ${bTerms(o)} · ${o.exp-S.day}d left</div>${R.reach<0.99&&!BIZ_T[o.type].l2?`<div class="why">They need the full internet. Your reach is ${pct(R.reach)}.</div>`:''}${o.type==='scrub'&&scrubCapacity(o.city)<o.bw?`<div class="why">Needs enough reachable scrubbing capacity (Hosting or Infra tab).</div>`:''}${reqList(o)}${bHas(o)?'':`<div class="why">Needs a POP in ${bCities(o).filter(x=>!S.pops[x]).map(x=>CITY[x].name).join(', ')} too.</div>`}</div>${bHas(o)?btn('Accept','accept',{id:o.id},'green sm'):''}${btn('No','decline',{id:o.id},'ghost sm')}</div>`).join('')}</section>`;
 }
 function linkPanel(id){
   const l=S.links.find(x=>x.id===id);if(!l){UI.sel=null;return '';}
@@ -2591,23 +2699,24 @@ function renderCustomers(){
   const value=b=>key==='name'?b.name:key==='city'?CITY[b.city].name:key==='revenue'?(BIZ_T[b.type].event?0:BIZ_T[b.type].fiber?b.rate:b.bw*b.rate):b.mood;
   const customers=S.biz.slice().sort((a,b)=>{const A=value(a),B=value(b);return (A<B?-1:A>B?1:0)*dir;});
   const mood=b=>BIZ_T[b.type].event?'Event':Math.max(0,Math.round(b.mood))+'%';
-  const reason=b=>{if(BIZ_T[b.type].event)return eventLive(b)?'Live event':'Waiting for the crowd';const issues=[];if(bizSf(b)<.95)issues.push('Not enough service');if(!BIZ_T[b.type].l2&&!BIZ_T[b.type].fiber&&R.reach<=.99)issues.push('Missing internet reach');if(!reqOk(b))issues.push('Contract requirements unmet');if(b.type==='scrub'&&!S.scrubAt)issues.push('No scrubbing center');return issues.join(' · ')||'All systems go';};
-  const h=`<div style="display:flex;align-items:center;gap:10px"><div class="grow"><div class="eyebrow">AS${S.asn} · ${esc(S.name)}</div><h2 style="font-size:28px">Customer satisfaction</h2></div>${btn('NOC','customerNoc',{},'ghost sm')}<button class="x" data-act="dashClose" aria-label="Close">×</button></div><p class="lead">${customers.length} customers. ${customers.filter(b=>b.mood<30).length} furious, ${customers.filter(b=>b.mood>=30&&b.mood<60).length} unhappy. The cancellation emails are not a growth strategy.</p><div class="panel2"><div class="tscroll"><table class="tbl"><thead><tr>${[['name','Customer'],['city','City'],['mood','Satisfaction'],['revenue','Monthly revenue']].map(([k,label])=>`<th><button class="thb" data-act="customerSort" data-args="${esc(JSON.stringify({k}))}">${label}${key===k?(dir>0?' ▲':' ▼'):''}</button></th>`).join('')}<th>Service</th><th></th></tr></thead><tbody>${customers.map(b=>`<tr><td><b>${esc(b.name)}</b><div class="meta">${esc(BIZ_T[b.type].n||b.type)}</div></td><td>${esc(bCities(b).map(c=>CITY[c].name).join(' ⇄ '))}</td><td style="color:${b.mood<30?'var(--bad)':b.mood<60?'var(--wave)':'var(--eye)'}">${mood(b)}</td><td>${BIZ_T[b.type].event?'One-off fee':fmt$(BIZ_T[b.type].fiber?b.rate:b.bw*b.rate)+'/mo'}</td><td>${esc(reason(b))}${reqList(b)}</td><td>${btn('Show','customerCity',{city:b.city},'ghost sm')}</td></tr>`).join('')}</tbody></table></div>${customers.length?'':'<p class="empty">No customers yet. The support phone is suspiciously quiet.</p>'}</div>`;
+  const reason=b=>{if(BIZ_T[b.type].event)return eventLive(b)?'Live event':'Waiting for the crowd';const issues=[];if(bizSf(b)<.95)issues.push('Not enough service');if(!BIZ_T[b.type].l2&&!BIZ_T[b.type].fiber&&R.reach<=.99)issues.push('Missing internet reach');if(!reqOk(b))issues.push('Contract requirements unmet');if(b.type==='scrub'&&scrubFraction(b.city)<.95)issues.push('Not enough reachable scrubbing capacity');return issues.join(' · ')||'All systems go';};
+  const h=`<div style="display:flex;align-items:center;gap:10px"><div class="grow"><div class="eyebrow">AS${S.asn} · ${esc(S.name)}</div><h2 style="font-size:28px">Customer satisfaction</h2></div>${btn('NOC','customerNoc',{},'ghost sm')}<button class="x" data-act="dashClose" aria-label="Close">×</button></div><p class="lead">${customers.length} business contracts. ${customers.filter(b=>b.mood<30).length} furious, ${customers.filter(b=>b.mood>=30&&b.mood<60).length} unhappy. The cancellation emails are not a growth strategy.</p><div class="panel2"><div class="tscroll"><table class="tbl"><thead><tr>${[['name','Customer'],['city','City'],['mood','Satisfaction'],['revenue','Monthly revenue']].map(([k,label])=>`<th><button class="thb" data-act="customerSort" data-args="${esc(JSON.stringify({k}))}">${label}${key===k?(dir>0?' ▲':' ▼'):''}</button></th>`).join('')}<th>Service</th><th></th></tr></thead><tbody>${customers.map(b=>`<tr><td><b>${esc(b.name)}</b><div class="meta">${esc(BIZ_T[b.type].l||b.type)}</div></td><td>${esc(bCities(b).map(c=>CITY[c].name).join(' ⇄ '))}</td><td style="color:${b.mood<30?'var(--bad)':b.mood<60?'var(--wave)':'var(--eye)'}">${mood(b)}</td><td>${BIZ_T[b.type].event?'One-off fee':fmt$(BIZ_T[b.type].fiber?b.rate:b.bw*b.rate)+'/mo'}</td><td>${esc(reason(b))}${reqList(b)}</td><td>${btn('Show','customerCity',{city:b.city},'ghost sm')}</td></tr>`).join('')}</tbody></table></div>${customers.length?'':'<p class="empty">No business contracts yet. The support phone is suspiciously quiet.</p>'}</div>${hostingCustomersPanel()}`;
   if(h!==UI._customerHTML||UI._dashRendered!=='customers'){$('dashCard').innerHTML=h;UI._customerHTML=h;UI._dashRendered='customers';}
 }
 
 function renderDash(){
   if(UI.dashView==='customers'){renderCustomers();return;}
+  if(UI.dashView==='log'){renderEventLog();return;}
   const H=S.hist||[],rows=H.slice(-90),last30=H.slice(-30);
   const up=last30.length?last30.reduce((a,r)=>a+(r.dem?Math.min(1,r.srv/r.dem):1),0)/last30.length:1;
   const net=R.revMo-R.costMo,tot=Object.values(R.egT).reduce((a,b)=>a+b,0)||1;
   const tile=(l,v,sub)=>`<div class="tile"><div class="lbl">${l}</div><div class="val">${v}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
-  let h=`<div style="display:flex;align-items:center;gap:10px"><div><div class="eyebrow">AS${S.asn} · ${esc(S.name)} · ${tierLabel()}</div><h2 style="font-size:28px">NOC dashboard</h2>${btn('Customers','customers',{},'ghost sm')}</div><button class="x" data-act="dashClose" aria-label="Close">×</button></div>
+  let h=`<div style="display:flex;align-items:center;gap:10px"><div><div class="eyebrow">AS${S.asn} · ${esc(S.name)} · ${tierLabel()}</div><h2 style="font-size:28px">NOC dashboard</h2>${btn('Customers','customers',{},'ghost sm')}${btn('Event log','eventLog',{},'ghost sm')}</div><button class="x" data-act="dashClose" aria-label="Close">×</button></div>
   <div class="dgrid">${tile('Traffic now',fmtG(R.served),`of ${fmtG(R.demand)} wanted`)}${tile('Peak',fmtG(S.stats.peak))}${tile('Delivered, 30 days',(up*100).toFixed(1)+'%',up>=0.999?'five nines-ish':up>=0.99?'two nines and change':'customers are upset')}${tile('Peering ratio',pct(R.peerShare||0),'caches, PNIs and IX')}${tile('Monthly P&L',`<span style="color:${net>=0?'var(--eye)':'var(--bad)'}">${net>=0?'+':''}${fmt$(net)}</span>`,`${fmt$(R.revMo)} in · ${fmt$(R.costMo)} out`)}${tile('Incidents',S.stats.incidents,`${S.stats.survived} shrugged off`)}</div>
   <div class="panel2" style="margin:12px 0"><h3>PNI directory</h3><p class="note">Find a network's meet-me rooms before ordering the patch cable.</p><label for="pniNetwork">Network </label><select id="pniNetwork">${NETS.filter(n=>n.pops.length).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(n=>`<option value="${n.id}">${esc(n.name)} · AS${n.asn}</option>`).join('')}</select> ${btn('Find PNI','pniPick',{},'pink sm')}</div>
   <div class="dcols"><div class="panel2"><h3>Traffic by way out</h3>${svgChart(rows,['c','p','ix','t','l2'],[{k:'dem',col:'#1E2640',dash:true}],v=>fmtCap(Math.round(v)))}<div class="legend">${Object.keys(EGC).map(k=>`<span><i style="background:${EGC[k][1]}"></i>${EGC[k][0]} ${pct((R.egT[k]||0)/tot)}</span>`).join('')}<span><i style="background:#fff;border-style:dashed"></i>Demand</span></div></div>
   <div class="panel2"><h3>Money per month</h3>${svgChart(rows,[],[{k:'rev',col:'#16A866'},{k:'cost',col:'#FF4D5E'}],v=>fmt$(v))}<div class="legend"><span><i style="background:#16A866"></i>Revenue</span><span><i style="background:#FF4D5E"></i>Costs</span></div>
-  <h3 style="margin-top:8px">Where the money goes</h3>${Object.entries(R.cost).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="kv"><span>${{pops:'POPs and routers',links:'Waves and fiber',transit:'Transit',ix:'IX ports',pni:'PNIs',caches:'Cache power',nni:'Fabric ports',optical:'Amp huts and spares',loans:'Loan repayments',revshare:'Investor revenue share',extras:'Licenses and scrubbing'}[k]||k}</span><b>${fmt$(v)}/mo</b></div>`).join('')}</div></div>`;
+  <h3 style="margin-top:8px">Where the money goes</h3>${Object.entries(R.cost).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="kv"><span>${{power:'Electricity and backup power',hosting:'Server rooms and own servers',maintenance:'Automatic maintenance',pops:'POPs and routers',links:'Waves and fiber',transit:'Transit',ix:'IX ports',pni:'PNIs',caches:'Cache power',nni:'Fabric ports',optical:'Amp huts and spares',loans:'Loan repayments',revshare:'Investor revenue share',extras:'Licenses and scrubbing'}[k]||k}</span><b>${fmt$(v)}/mo</b></div>`).join('')}</div></div>`;
   const tT=(R.egT.t||0)||1;
   const row=(n,e,want)=>{const t=e.c+e.p+e.ix+e.t;return {n,e,t,want,cost:(R.cost.transit||0)*e.t/tT,lost:want>0.01?Math.max(0,1-t/want):0};};
   const nets=NETS.filter(n=>!n.tail).map(n=>row(n,R.netEg[n.id]||{c:0,p:0,ix:0,t:0},R.demTo[n.id]||0));
@@ -2617,6 +2726,7 @@ function renderDash(){
   h+=`<div class="panel2" style="margin-top:12px"><h3>Traffic by network (ASN)</h3><p class="note" style="margin-top:0">Where your users' traffic comes from, and how it gets to you. Transit is the only part you pay per gigabit; caches, PNIs and IX peering are free or flat-rate. Tap a column to sort.</p><div class="legend" style="margin:0 0 6px">${['c','p','ix','t'].map(k=>`<span><i style="background:${EGC[k][1]}"></i>${EGC[k][0]}</span>`).join('')}</div><div class="tscroll"><table class="tbl"><thead><tr>${[['name','Network',''],['asn','AS',''],['type','Type',''],['traffic','Traffic','r'],['mix','How it arrives',''],['cost','Transit cost','r'],['lost','Lost','r']].map(([k,l,c])=>`<th class="${c}">${k==='mix'?l:`<button class="thb" data-act="dashSort" data-args="${esc(JSON.stringify({k}))}">${l}${UI.dashSort===k?(UI.dashDir>0?' ▲':' ▼'):''}</button>`}</th>`).join('')}</tr></thead><tbody>
   ${nets.map(({n,e,t,want})=>{return `<tr><td><span style="display:inline-flex;align-items:center;gap:6px">${logo(n)}<b>${esc(n.name)}</b></span></td><td>${n.asn}</td><td><span class="tag ${n.type}">${TYPE_L[n.type]}</span></td><td class="r">${fmtG(t)}</td><td><div class="mix" title="${['c','p','ix','t'].filter(k=>e[k]>0.01).map(k=>EGC[k][0]+' '+fmtG(e[k])).join(' · ')||'nothing yet'}">${['c','p','ix','t'].map(k=>`<i style="width:${t?e[k]/t*100:0}%;background:${EGC[k][1]}"></i>`).join('')}</div></td><td class="r">${e.t>0.01?fmt$((R.cost.transit||0)*e.t/tT)+'/mo':'—'}</td><td class="r" style="color:${want-t>want*0.05?'var(--bad)':'inherit'}">${want>0.01?pct(Math.max(0,1-t/want)):'—'}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   {const top=transitTop(S.transit.map(t=>t.id),8);if(top.length)h+=`<div class="panel2" style="margin-top:12px"><h3>Who your transit carries</h3><p class="note" style="margin-top:0">The networks you pay transit to reach, biggest first, and the cheapest way to move each one to peering. This is your to-do list on the way to Tier 1.</p>${top.map(([id,v])=>`<div class="row">${logo(NET[id])}<div class="grow"><div class="nm">${esc(NET[id].name)} <span class="meta">AS${NET[id].asn} · ${fmtG(v)} · about ${fmt$((R.cost.transit||0)*v/tT)}/mo</span></div><div class="meta">${esc(offTransitHint(id))} ${btn('Find PNI','pniFind',{net:id},'ghost sm')}</div></div></div>`).join('')}</div>`;}
+  h+=operationsDashboard();
   const ls=S.links.filter(l=>capOf(l)>0).map(l=>({l,u:(R.load[l.id]||0)/capOf(l)})).sort((a,b)=>b.u-a.u).slice(0,8);
   const rs=Object.keys(S.pops).map(c=>({c,u:(R.nodeLoad[c]||0)/(R.nodeCap[c]||1)})).sort((a,b)=>b.u-a.u).slice(0,6);
   h+=`<div class="dcols" style="margin-top:12px"><div class="panel2"><h3>Busiest links</h3>${ls.length?ls.map(({l,u})=>`<div class="row"><div class="grow"><div class="nm">${CITY[l.a].name} ⇄ ${CITY[l.b].name} <span class="meta">${capName(l)} · ${linkLat(l).toFixed(1)} ms</span></div><div class="bar ${barCls(u)}"><i style="width:${Math.min(100,u*100)}%"></i></div></div><b class="num" style="min-width:42px;text-align:right">${pct(u)}</b>${btn('Open','dashLink',{id:l.id},'ghost sm')}</div>`).join(''):'<p class="empty">No links yet.</p>'}</div>
@@ -2656,7 +2766,7 @@ function renderHint(){
 
 /* ---------- toasts & modals ---------- */
 function toast(html,kind='',actions=[]){
-  if(S){S.log=S.log||[];const tmp=document.createElement('div');tmp.innerHTML=html.replace(/<br>/g,' ');S.log.unshift({d:S.day,t:tmp.textContent,k:kind});if(S.log.length>30)S.log.length=30;}
+  if(S){S.log=S.log||[];const tmp=document.createElement('div');tmp.innerHTML=html.replace(/<br>/g,' ');recordEvent(tmp.textContent,kind);}
   const el=document.createElement('div');el.className='toast '+kind;
   el.innerHTML=`<div class="tx">${html}</div>${actions.map(a=>btn(a.l,a.act,a.args,'sm')).join('')}`;
   const box=$('toasts');box.prepend(el);const max=innerWidth<760?2:3;while(box.children.length>max)box.lastChild.remove();
@@ -2944,7 +3054,7 @@ const LBLW={};
 try{document.fonts&&document.fonts.ready.then(()=>{for(const k in LBLW)delete LBLW[k];});}catch(e){}
 function drawCity(C,sx,sy,sc,now,lyOverride){
   const hot=(UI.hotMap||{})[C.id];
-  const p=S.pops[C.id],down=p&&p.down>S.day,sel=UI.sel&&UI.sel.type==='city'&&UI.sel.id===C.id,hov=UI.hover===C.id||(UI.snap&&UI.snap.id===C.id);
+  const p=S.pops[C.id],down=p&&!popUp(C.id),sel=UI.sel&&UI.sel.type==='city'&&UI.sel.id===C.id,hov=UI.hover===C.id||(UI.snap&&UI.snap.id===C.id);
   const k=sc*(hov?1.15:1);
   ctx.save();ctx.translate(sx,sy);
   if(UI.feed&&UI.feed.has(C.id)){ctx.strokeStyle='#FF8A3D';ctx.lineWidth=4;ctx.setLineDash([3,5]);ctx.beginPath();ctx.arc(0,-6*k,36*k,0,7);ctx.stroke();ctx.setLineDash([]);}
@@ -3031,6 +3141,7 @@ let pressing=false;
 document.addEventListener('pointerdown',e=>{if(e.target.closest('#panel,#left'))pressing=true;});
 addEventListener('pointerup',()=>setTimeout(()=>pressing=false,0));
 addEventListener('pointercancel',()=>{pressing=false;});addEventListener('blur',()=>{pressing=false;});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='logQuery'){e.preventDefault();e.target.blur();ACT.logSearch();}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;audioInit();const fn=ACT[b.dataset.act];if(!fn)return;if(!S&&!['start','pickStart','cont','help','helpClose','newgame','mute','animSet','soundSet','closeModal','speed','bankClose','whatsNewShow','updateNow','updateLater','importPick','importGo','modeSet','scenarios','startScn','startWeekly'].includes(b.dataset.act))return;let a={};try{a=JSON.parse(b.dataset.args||'{}');}catch(_){}fn(a);});
 
 /* ================= LOOP ================= */

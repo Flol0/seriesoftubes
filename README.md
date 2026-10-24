@@ -4,7 +4,10 @@ This fork tracks [fjaeckel/seriesoftubes](https://github.com/fjaeckel/seriesoftu
 and preserves its English UI, artwork and game style. Play it at
 **[tubes.krieger.pm](https://tubes.krieger.pm)**.
 
-Version 1.10.1 includes upstream 1.10.0 plus the remaining requests from issues
+Version 1.11.0 adds power consumption, UPS and dual feeds, automatic maintenance,
+a persistent NOC event log and server rooms for colocation, web hosting, cloud
+instances and capacity-limited DDoS scrubbing. It includes upstream 1.10.0
+plus the requests from issues
 #12–#17, #19 and #20: customer dashboard, satisfaction warnings and optional
 auto-pause, PNI directory, grouped cable waves, feasible customer requirements,
 and dark-fiber reach checks. See CHANGELOG.md for the complete player notes.
@@ -18,7 +21,9 @@ npm run build
 ```
 
 The deployable static site is written to `_site/`. Development can also use
-`site/index.html` directly. Save files remain compatible with upstream 1.10.
+`site/index.html` directly. Existing saves migrate automatically. New server-room and power state is saved
+locally and included in exports. Older upstream versions will not simulate
+these new systems.
 
 ## Publishing
 

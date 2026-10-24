@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-10-24
+
+- Power is a real operating cost now. Routers, caches, optical gear and
+  servers draw power, cooling adds 35%, and each city has its own tariff.
+  Check the Power & cooling section in Infra or compare POPs in the NOC.
+- UPS batteries bridge one game day, generators burn diesel while the grid
+  is down, and an independent second feed protects against local faults.
+  Regional blackouts can take both feeds down. Batteries must recharge.
+- Maintenance happens automatically. The NOC gives seven days' notice;
+  redundant routers are serviced and swapped one at a time without customer
+  impact. A single router goes down for a day. Generator and server service
+  is automatic too, and optical channels periodically need maintenance.
+- A full NOC event log remembers the latest 300 entries, including recovery,
+  maintenance and customer changes. Filter by category or search by city.
+- Open server rooms: buy 20U racks, rent units to colocation tenants, or
+  install your own web, cloud and DDoS scrubbing servers. New customers arrive
+  weekly when service is healthy. Hosting brings traffic, power bills,
+  operating costs, revenue and satisfaction; poor service causes churn.
+- Scrubbing is capacity-limited and depends on power and a live backbone
+  path. Existing centers remain 400G appliances; extra servers add 100G each,
+  limited by the POP's forwarding capacity. Attacks above capacity still hurt.
+- Existing saves get sensible defaults and a fresh maintenance schedule.
+
+
 ## [1.10.1] — 2026-10-24
 
 - Your customers have a dashboard now: every contract, satisfaction, revenue,
