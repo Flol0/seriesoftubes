@@ -108,10 +108,10 @@ test('LAGs add members, capacity and cost to transit, IX ports and PNIs', () => 
   assert.equal(ev('S.transit[0].tier'), 2, 'upgrading a LAG upgrades every member');
   ev("ACT.lagT({id:S.transit[0].id,d:-1})");
   assert.equal(ev('S.transit[0].n'), 2);
-  ev("for(let i=0;i<10;i++)ACT.lagT({id:S.transit[0].id,d:1})");
-  assert.equal(ev('S.transit[0].n'), 8, 'capped at 8 members');
+  ev("S.pops.fra.routers=4;for(let i=0;i<LAG_MAX+4;i++)ACT.lagT({id:S.transit[0].id,d:1})");
+  assert.equal(ev('S.transit[0].n'), ev('LAG_MAX'), 'capped at the documented LAG member limit');
   ev("selectCity('fra');ACT.tab({t:'up'})");
-  assert.match(ev("document.getElementById('panelBody').textContent"), /8×400G LAG/);
+  assert.match(ev("document.getElementById('panelBody').textContent"), new RegExp(ev('LAG_MAX')+'×400G LAG'));
   assert.deepEqual(errors, []);
 });
 

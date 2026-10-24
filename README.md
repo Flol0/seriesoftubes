@@ -24,6 +24,25 @@ You start with one router in one city and grow into a transit-free Tier 1:
 
 Every company is a pun. No real company names are used.
 
+## Additional gameplay and operations
+
+- Customer satisfaction dashboard, early warnings, optional auto-pause,
+  reviewable bandwidth expansions and a PNI meet-me-room directory.
+- Metered POP power and cooling, UPS batteries, generator fuel, independent
+  feeds, and automatic maintenance with notices in a persistent NOC event log.
+- Colocation racks plus web, cloud and capacity-limited DDoS scrubbing servers.
+- Scalable 100G/400G/1.6T cache pools, optional service-switch banks, shared
+  uplink capacity, redundant pairs, LAGs, and purchase/capacity previews.
+- Tier-1 proprietary submarine cables and optical regeneration for terrestrial
+  dark fiber beyond 4,000 km, with construction and operating costs.
+- Ten additional hubs with carriers, local networks, fabric access and cable
+  routes; completed Italian connections and exchange names.
+- Expanded endgame router, LAG, NNI, virtual-circuit, rack and own-IX capacity.
+- iPad double-tap handling, preserved pinch zoom, map reset, wrapping city tabs,
+  and fixes for routing/accounting, imported saves and impossible contracts.
+
+See [CHANGELOG.md](CHANGELOG.md) for behavior, balance values and release notes.
+
 ## Playing locally
 
 It is a single static page with no build step for development:
