@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-10-24
+
+- Caches grow beyond four boxes. Add one or ten at a time, or upgrade the
+  interfaces from 100G to 400G and 1.6T. Boxes share a scalable pool instead
+  of creating thousands of routing exits. Router ports, service fees and
+  metered electricity still matter; overflow uses peering or transit.
+- Full circuits pause the game at 100% load, with an Inspect shortcut. Resume
+  without repeated interruptions: a circuit re-arms only below 90% load.
+  Disable this independently of customer warnings in Settings.
+- Customers can request bandwidth expansions with 30 days' notice. Accept to
+  schedule the extra capacity and revenue, or keep the current contract.
+  Nothing changes automatically; accepted expansions get 15 days of grace.
+- Tablet double taps no longer trigger default page zoom. Pinch zoom still
+  works, lifting one finger resumes panning, and the menu can reset the map.
+- Ten new hubs fill gaps: Vancouver, Winnipeg, Casablanca, Dakar, Accra,
+  Luanda, Dar es Salaam, Tashkent, Almaty and Hanoi. They include transit,
+  local peering, fabric access and three game-world coastal cable systems.
+- Endgame room: a 204.8T modular router, up to 64 routers and LAG members,
+  256 racks per POP, 1.6T fabrics and virtual circuits, and 409.6T own IXs.
+  Parallel waves and fiber remain available for further backbone growth.
+- Fixed North American power tariffs using the wrong region key, invalid NNI
+  and circuit data breaking imported saves, and phantom router capacity
+  when no router remained available.
+
+
 ## [1.11.0] — 2026-10-24
 
 - Power is a real operating cost now. Routers, caches, optical gear and

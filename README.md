@@ -4,7 +4,11 @@ This fork tracks [fjaeckel/seriesoftubes](https://github.com/fjaeckel/seriesoftu
 and preserves its English UI, artwork and game style. Play it at
 **[tubes.krieger.pm](https://tubes.krieger.pm)**.
 
-Version 1.11.0 adds power consumption, UPS and dual feeds, automatic maintenance,
+Version 1.12.0 adds scalable cache pools (100G–1.6T), configurable capacity
+pauses, customer expansion requests, tablet gesture fixes and ten new hubs.
+Large networks can grow with modular routers, 64-member LAGs, 256-rack server
+rooms and 1.6T fabrics. North American power accounting and malformed NNI save
+data are repaired. It also includes power consumption, UPS and dual feeds, automatic maintenance,
 a persistent NOC event log and server rooms for colocation, web hosting, cloud
 instances and capacity-limited DDoS scrubbing. It includes upstream 1.10.0
 plus the requests from issues
