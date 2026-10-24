@@ -1,0 +1,13 @@
+{
+  "version": "1.10.1",
+  "date": "2026-10-24",
+  "notes": [
+    "Your customers have a dashboard now: every contract, satisfaction, revenue, service problem and requirement, sortable and one click away from its city (#14).",
+    "Satisfaction stays in the top bar, warns before customers are furious, and pauses the game when they become furious. Turn auto-pause off in Settings (#13, #15).",
+    "Find PNI meet-me rooms from transit destinations and the NOC, including cities you have not built in yet and the reason a network will not peer with you (#12).",
+    "Parallel waves on one cable segment share a map line and a combined capacity label. Open the line to inspect and manage each wave separately (#19).",
+    "Local breakout accepts PNIs too (#20). Shark-averse customers no longer ask for land paths across oceans (#16). Dark fiber orders beyond the reach of every available optic are refused before you pay for the trench (#17).",
+    "Rival IX outages and de-peering notices no longer mistake exchange IDs for cities. Auto-pause stops the remaining days in a fast simulation frame.",
+    "Updated from upstream 1.10.0 and published for tubes.krieger.pm."
+  ]
+}

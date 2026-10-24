@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tubes.krieger.pm/sitemap.xml
