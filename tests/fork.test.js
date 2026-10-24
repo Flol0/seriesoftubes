@@ -69,7 +69,7 @@ test('1.10 rival IX incidents and de-peering never treat exchange IDs as city ID
 
 test('switching from customers to the NOC restores the dashboard even when data is unchanged',()=>{
   const {ev}=load();
-  ev("ACT.start({});ACT.dash();ACT.customers();ACT.dashClose();ACT.dash()");
+  ev("ACT.start({});ACT.dash();ACT.customers();const customerTable=document.querySelector('#dashCard table');renderDash();if(document.querySelector('#dashCard table')!==customerTable)throw Error('Unchanged customer table was replaced');ACT.dashClose();ACT.dash()");
   assert.match(ev("document.getElementById('dashCard').textContent"),/PNI directory/);
   ev("ACT.pniPick()");
   assert.match(ev("document.getElementById('modalCard').textContent"),/meet-me rooms/);
