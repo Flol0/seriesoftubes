@@ -1,10 +1,10 @@
 {
-  "version": "1.13.0",
+  "version": "1.14.0",
   "date": "2026-10-24",
   "notes": [
-    "Tier 1 networks can build proprietary submarine cables along surveyed sea corridors. Pay for construction, ROADMs and wet repeaters, wait for laying, then install up to 64 independent 400G wet-plant channels. No wave rent; upkeep, failures, regional risks and landing permits still apply. Sandbox also unlocks cable construction.",
-    "Terrestrial dark fiber extends beyond 4,000 km using level-4 ROADMs and per-channel optical regeneration. Extra hardware and monthly site costs scale with the number of spans rather than imposing a fixed distance cap.",
-    "Completed the Italian routes requested in upstream #21: Rome to Milan via Genoa, Palermo and Marseille; Palermo joins the FEA-ish and SEE-ME-WAVE 4-ish corridors. Milan has RisottIX and Rome has CarbonarIX.",
-    "City-panel tabs wrap within the drawer on laptops and tablets, keeping Hosting visible without overflowing the panel."
+    "Optional service-switch banks aggregate cache boxes and hosting rack handoffs. Three models provide 48, 96 or 256 access ports per bank. Only uplinks use router ports; a shared service traffic budget limits actual throughput. Existing saves retain direct attachment until switches are installed.",
+    "Expand banks, upgrade access and uplink speeds, or bundle up to 64 uplinks per chassis. Every purchase previews capacity, port needs and recurring costs. Switches and uplinks add power and operating costs.",
+    "Pair each bank for redundant attachment. Access slots are not double-sold; both chassis contribute uplink bandwidth. Automatic maintenance rolls one chassis at a time. Failures are replaced automatically, and separate POP sites protect paired members from a local building outage. Spare uplink capacity is still needed when a member is offline.",
+    "Hosting and Infra show a POP capacity overview. The NOC compares service access ports and actual uplink use, flags busy service uplinks, and includes them in the configurable 100% circuit-load pause."
   ]
 }
