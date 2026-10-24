@@ -1,12 +1,12 @@
 {
   "name": "seriesoftubes",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "A cartoon browser game about building the internet.",
   "private": true,
   "homepage": "https://tubes.krieger.pm/",
   "repository": { "type": "git", "url": "git+https://github.com/Flol0/seriesoftubes.git" },
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/game.test.js tests/build.test.js tests/persist.test.js tests/services.test.js tests/peering.test.js tests/issues.test.js tests/regions.test.js tests/modes.test.js tests/fork.test.js tests/operations.test.js tests/scaling.test.js tests/submarine.test.js",
+    "test": "node --test --test-concurrency=1 tests/game.test.js tests/build.test.js tests/persist.test.js tests/services.test.js tests/peering.test.js tests/issues.test.js tests/regions.test.js tests/modes.test.js tests/fork.test.js tests/operations.test.js tests/scaling.test.js tests/submarine.test.js tests/service-fabric.test.js",
     "build": "bash scripts/build.sh",
     "serve": "npm run build && npx --yes serve@14.2.4 _site"
   },

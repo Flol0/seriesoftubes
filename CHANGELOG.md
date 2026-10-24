@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-10-24
+
+- Optional service-switch banks aggregate cache boxes and hosting rack handoffs.
+  Three models provide 48, 96 or 256 access ports per bank. Only uplinks use
+  router ports; a shared service traffic budget limits actual throughput.
+  Existing saves retain direct attachment until switches are installed.
+- Expand banks, upgrade access and uplink speeds, or bundle up to 64 uplinks
+  per chassis. Every purchase previews capacity, port needs and recurring
+  costs. Switches and uplinks add power and operating costs.
+- Pair each bank for redundant attachment. Access slots are not double-sold;
+  both chassis contribute uplink bandwidth. Automatic maintenance rolls one
+  chassis at a time. Failures are replaced automatically, and separate POP
+  sites protect paired members from a local building outage. Spare uplink
+  capacity is still needed when a member is offline.
+- Hosting and Infra show a POP capacity overview. The NOC compares service
+  access ports and actual uplink use, flags busy service uplinks, and includes
+  them in the configurable 100% circuit-load pause.
+
+
 ## [1.13.0] — 2026-10-24
 
 - Tier 1 networks can build proprietary submarine cables along surveyed sea

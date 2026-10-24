@@ -4,6 +4,8 @@ This fork tracks [fjaeckel/seriesoftubes](https://github.com/fjaeckel/seriesoftu
 and preserves its English UI, artwork and game style. Play it at
 **[tubes.krieger.pm](https://tubes.krieger.pm)**.
 
+Version 1.14.0 adds optional shared service-switch banks for caches and hosting,
+paired redundancy, rolling maintenance and POP capacity planning.
 Version 1.13.0 adds Tier-1 proprietary submarine cables, terrestrial optical
 regeneration beyond 4,000 km, completed Italian cable routes and wrapping
 city-panel tabs. Version 1.12.0 adds scalable cache pools (100G–1.6T), configurable capacity
