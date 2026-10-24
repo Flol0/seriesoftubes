@@ -36,15 +36,15 @@ test('shark-averse offers always stay on one landmass',()=>{
   assert.ok(result.sharks>0);
 });
 
-test('unlightable dark fiber is rejected before payment or building a POP',()=>{
+test('long-haul regeneration stays locked before level 4',()=>{
   const {ev}=load();
-  ev("ACT.start({});S.cash=1e9;S.lvl=4;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='roadm'");
+  ev("ACT.start({});S.cash=1e9;S.lvl=3;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='roadm'");
   assert.ok(ev("kmBetween('fra','sin')>dfMaxReach()"));
   ev('ACT.orderDf()');
   assert.equal(ev('S.cash'),1e9);
   assert.equal(ev('S.links.length'),0);
   assert.equal(ev('!!S.pops.sin'),false);
-  assert.match(ev("dfModalBody('fra','sin',kmBetween('fra','sin'),0)"),/longest-reach/);
+  assert.match(ev("dfModalBody('fra','sin',kmBetween('fra','sin'),0)"),/regeneration/);
 });
 
 test('parallel cable waves group by segment without merging other cables or dark fiber',()=>{

@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-10-24
+
+- Tier 1 networks can build proprietary submarine cables along surveyed sea
+  corridors. Pay for construction, ROADMs and wet repeaters, wait for laying,
+  then install up to 64 independent 400G wet-plant channels. No wave rent;
+  upkeep, failures, regional risks and landing permits still apply. Sandbox
+  also unlocks cable construction.
+- Terrestrial dark fiber extends beyond 4,000 km using level-4 ROADMs and
+  per-channel optical regeneration. Extra hardware and monthly site costs
+  scale with the number of spans rather than imposing a fixed distance cap.
+- Completed the Italian routes requested in upstream #21: Rome to Milan via
+  Genoa, Palermo and Marseille; Palermo joins the FEA-ish and SEE-ME-WAVE 4-ish
+  corridors. Milan has RisottIX and Rome has CarbonarIX.
+- City-panel tabs wrap within the drawer on laptops and tablets, keeping
+  Hosting visible without overflowing the panel.
+
+
 ## [1.12.0] — 2026-10-24
 
 - Caches grow beyond four boxes. Add one or ten at a time, or upgrade the
