@@ -36,15 +36,13 @@ test('shark-averse offers always stay on one landmass',()=>{
   assert.ok(result.sharks>0);
 });
 
-test('long-haul regeneration stays locked before level 4',()=>{
+test('long-haul fiber can be ordered before level 4 with explicit regeneration',()=>{
   const {ev}=load();
-  ev("ACT.start({});S.cash=1e9;S.lvl=3;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='roadm'");
-  assert.ok(ev("kmBetween('fra','sin')>dfMaxReach()"));
-  ev('ACT.orderDf()');
-  assert.equal(ev('S.cash'),1e9);
-  assert.equal(ev('S.links.length'),0);
-  assert.equal(ev('!!S.pops.sin'),false);
-  assert.match(ev("dfModalBody('fra','sin',kmBetween('fra','sin'),0)"),/regeneration/);
+  ev("ACT.start({});S.cash=1e9;S.lvl=3;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='roadm';ACT.orderDf()");
+  assert.equal(ev('S.links.length'),1);
+  assert.equal(ev('S.links[0].regen'),0);
+  assert.ok(ev('S.cash')<1e9);
+  assert.ok(ev('regenNeed("tp16",S.links[0])')>0);
 });
 
 test('parallel cable waves group by segment without merging other cables or dark fiber',()=>{
@@ -86,5 +84,5 @@ test('de-peering at a rival exchange uses its parent city in the notice',()=>{
   const {ev}=load();
   ev("ACT.start({});S.cash=1e9;const rival=XIX.find(x=>x.c==='fra').id;let found=false;for(let d=1;d<800&&!found;d++){S.day=d-1;for(const n of NETS.filter(bigPeer))if(snub(n.id,rival)){S.peers={[n.id+'@'+rival]:true};found=true;break;}}if(!found)throw Error('no snub found');dayTick()");
   assert.equal(ev('Object.keys(S.peers).length'),0);
-  assert.match(ev('document.body.textContent'),/de-peered you in Frankfurt/);
+  assert.match(ev('document.body.textContent'),/de-peered you at .* in Frankfurt/);
 });

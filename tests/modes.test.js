@@ -76,7 +76,7 @@ test('conferences: register, attend, and selective peers get easier for a while'
   const { ev, errors } = load();
   ev("ACT.start({});S.cash=1e9;for(const g of GOALS)S.done[g.id]=0");
   ev("S.day=confDay(CONFS.find(c=>c.c==='fra'),0)-20;ACT.leftTab({t:'deals'})");
-  assert.match(ev("document.body.textContent"), /DENOG-ish/);
+  assert.match(ev("document.body.textContent"), /DENOG/);
   const key = ev("upcomingConfs(30).find(c=>c.c==='fra').key");
   ev(`ACT.confGo({key:'${key}'})`);
   const need0 = ev("(()=>{R.demTo.nfx=0;return peerOk('nfx','ix','fra').why})()");
@@ -166,5 +166,22 @@ test('RouteScript: parses safely, reports errors helpfully, and changes routing'
   assert.match(ev("document.getElementById('modalCard').textContent"), /commit failed/);
   ev("ACT.teClear()");
   assert.equal(ev("S.te.script"), '');
+  assert.deepEqual(errors, []);
+});
+
+test('#27 new networks get a random name, and "Another one" never repeats it', () => {
+  const { ev, errors } = load();
+  assert.ok(ev("NETWORK_NAMES.every(n=>n.length<=24)&&new Set(NETWORK_NAMES).size===NETWORK_NAMES.length"));
+  const first = ev("document.getElementById('nmIn').value");
+  assert.ok(ev(`NETWORK_NAMES.includes(${JSON.stringify(first)})`));
+  let prev = first;
+  for (let i = 0; i < 40; i++) {
+    ev("ACT.randomName()");
+    const now = ev("document.getElementById('nmIn').value");
+    assert.notEqual(now, prev);
+    prev = now;
+  }
+  ev("document.getElementById('nmIn').value='My Own Net';ACT.start({})");
+  assert.equal(ev("S.name"), 'My Own Net');
   assert.deepEqual(errors, []);
 });

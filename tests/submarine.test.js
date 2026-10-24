@@ -24,12 +24,22 @@ test('own wet plant is independently routed, carries traffic after construction 
  assert.equal(ev('S.links[0].routeCable'),ev('sea.routeCable'));assert.equal(ev('S.links[0].trench'),ev('S.links[0].id'));assert.match(ev("document.getElementById('panelBody').textContent"),/Own submarine cable/);assert.deepEqual(errors,[]);
 });
 
-test('terrestrial regeneration scales beyond 4000 km and charges hardware and running costs per span',()=>{
- const {ev,errors}=load();start(ev);ev("S.pops.fra.rgen=10;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='lite';ACT.orderDf();window.fiber=S.links[0];S.pops.sin.rgen=10");
- assert.ok(ev('fiber.km')>4000);assert.equal(ev('fiber.sys'),'roadm');assert.equal(ev("chWhy(fiber,'tp16')"),'');const n=ev("regenCount(fiber,'tp16')");assert.ok(n>=2);
- const before=ev('S.cash');ev("ACT.addCh({id:fiber.id,o:'tp16'})");assert.equal(before-ev('S.cash'),ev("OPT.tp16.cost*(1+regenCount(fiber,'tp16'))"));
- assert.equal(ev('dfCap(fiber)'),0);ev('S.day=fiber.ready;compute()');assert.equal(ev('dfCap(fiber)'),1600);assert.equal(ev('regenMo(fiber)'),n*250);assert.equal(ev('R.cost.optical'),ev('ampCount(fiber.km)*AMP_MO')+n*250);
- ev("S=migrate(JSON.parse(JSON.stringify(S)));compute();ACT.rmCh({id:S.links[0].id,o:'tp16'})");assert.equal(ev('regenMo(S.links[0])'),0);assert.match(ev("chWhy(S.links[0],'wet4')"),/only.*submarine/);assert.deepEqual(errors,[]);
+test('terrestrial regeneration scales beyond 4000 km with explicit hardware and running costs',()=>{
+ const {ev,errors}=load();start(ev);ev("S.pops.fra.rgen=10;UI.pending={a:'fra',b:'sin'};UI.dfSrc='build';UI.dfSys='roadm';ACT.orderDf();window.fiber=S.links[0];S.pops.sin.rgen=10");
+ assert.ok(ev('fiber.km')>4000);assert.equal(ev('fiber.regen'),0);
+ const n=ev("regenNeed('tp16',fiber)");assert.ok(n>=2);
+ const sites=ev('S.cash');ev("for(let i=0;i<regenNeed('tp16',fiber);i++)ACT.regen({id:fiber.id,d:1})");assert.equal(sites-ev('S.cash'),ev('REGEN_COST')*n);
+ assert.equal(ev("chWhy(fiber,'tp16')"),'');
+ const before=ev('S.cash');ev("ACT.addCh({id:fiber.id,o:'tp16'})");assert.equal(before-ev('S.cash'),ev("channelCost(fiber,'tp16')"));
+ assert.equal(ev('dfCap(fiber)'),0);ev('S.day=fiber.ready;compute()');assert.equal(ev('dfCap(fiber)'),1600);assert.equal(ev('regenMo(fiber)'),n*900);assert.equal(ev('R.cost.optical'),ev('ampCount(fiber.km)*AMP_MO')+n*900);
+ ev("S=migrate(JSON.parse(JSON.stringify(S)));compute();ACT.rmCh({id:S.links[0].id,o:'tp16'})");assert.equal(ev('regenMo(S.links[0])'),n*900);assert.match(ev("chWhy(S.links[0],'wet4')"),/only.*submarine/);assert.deepEqual(errors,[]);
+});
+
+test('legacy full-rate long-haul channels keep their capacity after migration',()=>{
+ const {ev,errors}=load();start(ev);
+ ev("S.links.push({id:'legacy',a:'fra',b:'sin',kind:'df',own:true,sys:'roadm',ch:['tp16'],km:kmBetween('fra','sin'),ready:0,mo:100,cut:0});S=migrate(JSON.parse(JSON.stringify(S)))");
+ assert.equal(ev('S.links[0].regen'),ev("regenNeed('tp16',S.links[0])"));
+ assert.equal(ev('dfCap(S.links[0])'),1600);assert.deepEqual(errors,[]);
 });
 
 test('Italian upstream routes are selectable and Rome has coastal backhaul',()=>{

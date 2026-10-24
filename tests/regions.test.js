@@ -322,3 +322,58 @@ test('router ports are finite: plugging in fills them, more routers or bigger mo
   assert.ok(ev("RG.every(r=>r.ports>0&&r.cls>=0&&r.maxP<PORT.length)"));
   assert.deepEqual(errors, []);
 });
+
+test('Barcelona is wired up: a coastal cable, CDNs and a proper Tokyo challenger', () => {
+  const { ev, errors } = load();
+  assert.ok(ev("cablesFor('bcn','mrs').length>0&&cablesFor('lis','bcn').length>0"));
+  assert.ok(ev("NET.fbk.pops.includes('bcn')&&NET.amz.pops.includes('bcn')"));
+  assert.equal(ev("ixName('tok~2')"), 'Bento-IX');
+  assert.ok(ev("ixMul('tok~2')<1"), 'challengers undercut the incumbent');
+  assert.deepEqual(errors, []);
+});
+
+test('Korea: sender pays, pricey transit, Glitch leaves and Faceplant detours', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'icn'});ACT.buildPop({city:'sin'})");
+  assert.ok(ev("regionMult('icn')>regionMult('sin')"), 'Seoul transit costs more than the rest of Asia');
+  for (const n of ['ktt', 'skb', 'lgu']) {
+    assert.equal(ev(`NET.${n}.pol`), 'paid');
+    assert.match(ev(`peerOk('${n}','ix','icn').why`), /Sender pays/);
+  }
+  ev("S.pops.icn.bb={d:400};ACT.buyTransit({city:'icn',net:'ntt',tier:1});ACT.pni({city:'icn',net:'ktt',tier:1});compute()");
+  const used = ev("R.usePni[S.pni[0].id]||0");
+  assert.ok(used > 0, 'traffic flows over the Kay-Tea PNI');
+  assert.equal(ev("R.cost.pni"), ev(`PORT[1].pni+NET.ktt.paidFee+Math.round(NET.ktt.perG*${used})`), 'billed per gigabit sent');
+  const amz0 = ev("R.demTo.amz"); ev("S.krExit=S.day+1;compute()");
+  assert.ok(ev("R.demTo.amz") < amz0, 'Glitch leaving cuts its Seoul traffic');
+  const evSrc = ev('fireEvent.toString()').replace(/^function fireEvent/, 'function').replace('const e=pick(opts);', "const e='krroute';");
+  ev('window.__fe=' + evSrc + ';__fe();compute()');
+  assert.ok(ev("S.ev.krroute>S.day&&S.inc.some(i=>i.type==='krroute')"));
+  assert.ok(ev("SCN.some(s=>s.id==='gangnam'&&s.city==='icn')"));
+  assert.deepEqual(errors, []);
+});
+
+test('Sparkly Seabone is a Tier 1 now, but old saves keep the five they played for', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({})");
+  assert.equal(ev("NET.skl.type"), 't1');
+  assert.ok(ev("NET.skl.pops.includes('nyc')&&NET.skl.pops.includes('sao')&&NET.skl.pops.includes('pmo')"));
+  assert.equal(ev("t1Need().length"), 6, 'new games need all six');
+  ev("delete S.t1v");
+  assert.equal(ev("t1Need().length"), 5, 'older saves keep five');
+  assert.deepEqual(errors, []);
+});
+
+test('more UK and Norway: Manchester, Edinburgh, Bude and Stavanger with North Sea and Atlantic cables', () => {
+  const { ev, errors } = load();
+  for (const c of ['man', 'edi', 'bde', 'svg']) {
+    assert.ok(ev(`!!CITY.${c}`), c);
+    assert.ok(ev(`NETS.filter(n=>n.price&&n.pops.includes('${c}')).length`) >= 2, `${c} has transit sellers`);
+  }
+  for (const [a, b] of [['svg', 'edi'], ['dub', 'svg'], ['man', 'cph'], ['edi', 'rek'], ['nyc', 'bde'], ['bde', 'lag'], ['svg', 'ams']])
+    assert.ok(ev(`cablesFor('${a}','${b}').length`) > 0, `${a}-${b} cable`);
+  assert.ok(ev("subDfCable('svg','edi')"), 'NO-UK sells dark fiber pairs');
+  assert.equal(ev("cablesFor('lon','par').length"), 2, 'two ways under the Channel');
+  assert.ok(ev("['btt','sky','vmo'].every(n=>NET[n].pops.includes('man'))"));
+  assert.deepEqual(errors, []);
+});

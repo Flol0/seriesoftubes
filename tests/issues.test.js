@@ -191,3 +191,97 @@ test('#11 pausing freezes the dots on the links', () => {
   assert.ok(ev("animT") > t0, 'and moves again on play');
   assert.deepEqual(errors, []);
 });
+
+test('#16 shark-averse customers only ask for routes that can stay on land', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0");
+  ev("for(const c of ['ams','lon','nyc','ash','chi','sjc','sin','tok','syd','sao','jnb','bom','par','mad'])ACT.buildPop({city:c})");
+  let shark = 0, bad = [];
+  for (let i = 0; i < 1500; i++) {
+    const o = JSON.parse(ev("S.offers=[];spawnOffer();JSON.stringify(S.offers.filter(o=>(o.reqs||[]).includes('sharks')).map(o=>[o.city,o.city2]))"));
+    for (const [a, b] of o) { shark++; if (ev(`CITY['${a}'].land!==CITY['${b}'].land`)) bad.push(a + '-' + b); }
+  }
+  assert.ok(shark > 0, 'the requirement still shows up');
+  assert.deepEqual(bad, [], 'never across an ocean');
+  // old saves: an impossible ask is dropped, a possible one stays
+  const s = ev("JSON.stringify(Object.assign(JSON.parse(JSON.stringify(S)),{offers:[{id:'o1',type:'l2vpn',city:'nyc',city2:'lon',name:'x',bw:10,rate:1,reqs:['sharks','gen'],exp:S.day+9},{id:'o2',type:'l2vpn',city:'nyc',city2:'chi',name:'y',bw:10,rate:1,reqs:['sharks'],exp:S.day+9}]}))");
+  const m = JSON.parse(ev(`JSON.stringify(migrate(${s}).offers.map(o=>o.reqs))`));
+  assert.deepEqual(m, [['gen'], ['sharks']]);
+  assert.deepEqual(errors, []);
+});
+
+test('#28 scenic routing stays put, and splits over two equally quiet paths', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  ev("for(const c of ['ams','lon','par'])ACT.buildPop({city:c});const L=(a,b,t,v)=>{UI.via=v||null;openLinkModal(a,b);ACT.buildLink({tier:t});closeModal();};L('fra','ams',1);L('ams','lon',1,'uly');L('fra','par',1);L('par','lon',1,'chn')");
+  ev("S.biz.push({id:'bulk1',type:'bulk',name:'Sloth Sync',city:'fra',city2:'lon',bw:60,rate:1000,reqs:[],route:'scenic',mood:100,start:S.day});compute()");
+  const loads = () => JSON.parse(ev("JSON.stringify(['fra|par','ams|fra'].map(k=>Math.round((R.ef[k]&&R.ef[k].eg['l2:bulk1'])||0)))"));
+  const seen = [];
+  for (let d = 0; d < 6; d++) { ev('compute()'); seen.push(loads().join('/')); }
+  assert.equal(new Set(seen).size, 1, `no flapping day to day (${seen})`);
+  const [viaPar, viaAms] = loads();
+  assert.ok(viaPar > 0 && viaAms > 0, `both quiet paths carry it (${viaPar}/${viaAms})`);
+  assert.equal(ev("R.l2['bulk1']"), 60, 'the whole circuit is delivered');
+  ev("selectCity('fra');ACT.tab({t:'cust'})");
+  assert.deepEqual(errors, []);
+});
+
+test('#17 #30 very long dark fiber runs in long-haul mode, and regen sites bring full speed back', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  // a 4,500+ km terrestrial dark fiber with a ROADM, like the one in #30
+  ev("ACT.buildPop({city:'mos'});S.links.push({id:'lf',a:'lis',b:'mos',kind:'df',km:4551,sys:'roadm',ch:[],ready:0,mo:1000,day:0,cut:0});ACT.buildPop({city:'lis'});S.pops.lis.rgen=3;S.pops.mos.rgen=3;compute()");
+  assert.equal(ev("chWhy(S.links.find(l=>l.id==='lf'),'tp16')"), '', 'the transponder fits now');
+  ev("ACT.addCh({id:'lf',o:'tp16'});compute()");
+  assert.equal(ev("dfCap(S.links.find(l=>l.id==='lf'))"), 800, 'long-haul mode: 800G per channel');
+  ev("ACT.regen({id:'lf',d:1});compute()");
+  const l = "S.links.find(l=>l.id==='lf')";
+  assert.equal(ev(`${l}.regen`), 1);
+  assert.equal(ev(`spanKm(${l})`), 2276);
+  assert.equal(ev(`dfCap(${l})`), 1600, 'one regen site: full 1.6T again');
+  assert.ok(ev("R.cost.optical") >= ev("REGEN_MO"), 'regen huts cost rent');
+  assert.match(ev("chWhy({km:20000,regen:0,sys:'roadm',ch:[],a:'lis',b:'mos'},'zr4')"), /regen site/, 'hopeless spans say what to do');
+  // removing a regen site that optics still need is refused
+  ev("S.links.find(l=>l.id==='lf').km=15000;ACT.regen({id:'lf',d:-1})");
+  assert.equal(ev(`${l}.regen`), 1);
+  ev("ACT.selLink({id:'lf'})");
+  assert.match(ev("document.getElementById('panelBody').textContent"), /Regen sites/);
+  assert.deepEqual(errors, []);
+});
+
+test('LACP trouble, partial packet loss and PMTUD black holes fire, hurt and clear', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  ev("ACT.buildPop({city:'ams'});UI.via=null;openLinkModal('fra','ams');ACT.buildLink({tier:1});closeModal();ACT.buyTransit({city:'fra',net:'cog',tier:1});ACT.lagT({id:S.transit[0].id,d:1});ACT.buyIx({city:'ams',tier:1});ACT.lagIx({city:'ams',d:1});S.day=100;compute()");
+  const src = ev('fireFailure.toString()').replace(/^function fireFailure/, 'function').replace('let tot=opts.reduce', "opts.splice(0,opts.length,['funny',1]);let tot=opts.reduce");
+  const fire = (t) => { ev('window.__ff=' + src.replace('type=pick(f);}', `type='${t}';}`)); ev('__ff();compute()'); };
+  for (let i = 0; i < 12; i++) { fire('lacp'); }
+  assert.ok(ev("S.inc.some(i=>i.type==='lacp')"), 'LACP incidents fire');
+  assert.ok(ev("S.transit[0].lacp||S.ev.ixlacp"), 'a LAG is degraded');
+  fire('loss');
+  const l = "S.links.find(l=>l.loss)";
+  if (ev(`!!${l}`)) assert.ok(ev(`capOf(${l})<LT[${l}.tier].g`), 'loss cuts goodput');
+  const dem = ev('R.served');
+  fire('pmtud');
+  assert.ok(ev("!!S.ev.pmtud&&S.inc.some(i=>i.type==='pmtud')"));
+  assert.ok(ev('R.served') <= dem + 1e-6, 'some traffic never completes');
+  for (const t of ['lacp', 'loss', 'pmtud']) assert.notEqual(ev(`incTitle('${t}')`), 'Incident');
+  ev("for(const i of S.inc.slice())clearInc(i);compute()");
+  assert.equal(ev("!!(S.transit[0].lacp||S.ev.pmtud||S.links.some(l=>l.loss)||(S.ev.ixlacp&&Object.keys(S.ev.ixlacp).length))"), false, 'everything clears');
+  assert.deepEqual(errors, []);
+});
+
+test('an optical control plane meltdown darkens every leased wave in a region, not your own fiber', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  ev("for(const c of ['ams','par','ber'])ACT.buildPop({city:c});const L=(a,b)=>{UI.via=null;openLinkModal(a,b);ACT.buildLink({tier:1});closeModal();};L('fra','ams');L('fra','par');L('fra','ber');S.links.push({id:'dfx',a:'ams',b:'ber',kind:'df',km:580,sys:'lite',ch:['zr4'],ready:0,mo:500,day:0,cut:0});S.day=120;compute()");
+  const src = ev('fireEvent.toString()').replace(/^function fireEvent/, 'function').replace('const e=pick(opts);', "const e='ctrlplane';");
+  ev('window.__fe=' + src + ';__fe();compute()');
+  assert.equal(ev("S.links.filter(l=>l.kind==='wave').every(l=>linkDown(l))"), true, 'all leased waves in Europe are dark');
+  assert.equal(ev("linkDown(S.links.find(l=>l.id==='dfx'))"), false, 'own dark fiber keeps working');
+  const inc = "S.inc.find(i=>i.type==='ctrlplane')";
+  assert.ok(ev(`${inc}.cost>0`));
+  ev(`ACT.fixInc({id:${inc}.id});compute()`);
+  assert.equal(ev("S.links.filter(l=>l.kind==='wave').some(l=>linkDown(l))"), false, 'escalating brings them back');
+  assert.deepEqual(errors, []);
+});

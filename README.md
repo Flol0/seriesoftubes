@@ -4,6 +4,8 @@ This fork tracks [fjaeckel/seriesoftubes](https://github.com/fjaeckel/seriesoftu
 and preserves its English UI, artwork and game style. Play it at
 **[tubes.krieger.pm](https://tubes.krieger.pm)**.
 
+Version 1.15.0 integrates upstream 1.11–1.14, including mobile/PWA support,
+Italian, new regions and incidents, and updated optical reach/regeneration.
 Version 1.14.0 adds optional shared service-switch banks for caches and hosting,
 paired redundancy, rolling maintenance and POP capacity planning.
 Version 1.13.0 adds Tier-1 proprietary submarine cables, terrestrial optical
