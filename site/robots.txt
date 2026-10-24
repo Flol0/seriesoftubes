@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://seriesoftub.es/sitemap.xml
+Sitemap: https://tubes.krieger.pm/sitemap.xml
