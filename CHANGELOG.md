@@ -6,11 +6,13 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.25.2] — 2026-10-25
+
 - Your own IX now supports extra router uplinks and the A/B/Both site controls. Uplinks use router ports, share the fabric capacity and keep working through a single-site outage when split across both sites (#36).
 
 - A PNI in the customer’s city now meets their local-breakout requirement while your network is Tier 1 (#20).
 
-## [1.25.2] — 2026-10-25
+- Retained the PNI directory, missing-POP deal navigation, installed-app HUD fix and on-demand link redundancy checks.
 
 - Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a
   cable landing station, pay a frankly rude amount of money, wait while a cable
