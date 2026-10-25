@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.25.1-qol.2] — 2026-10-25
+
+- Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network.
+
 ## [1.25.1-qol.1] — 2026-10-25
 
 - A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
