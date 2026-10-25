@@ -1,7 +1,7 @@
 # Series of Tubes
 
 > Series of Tubes is a free cartoon browser game about building the internet.
-> Play it at https://tubes.krieger.pm/ — it runs entirely in the browser, needs no
+> Play it at https://seriesoftub.es/ — it runs entirely in the browser, needs no
 > account, and saves progress locally.
 
 You start as a small network with one router in one city and grow into a
@@ -24,7 +24,7 @@ for every company:
   RPKI and BGP hijacks, DDoS, cooling failures, Red Sea and Baltic cable cuts,
   sovereign internet drills and other geopolitical events.
 
-Version: 1.15.0 (2026-10-25)
+Version: 1.22.0 (2026-10-25)
 Source: https://github.com/fjaeckel/seriesoftubes
 
 ## Learn how the internet really works
