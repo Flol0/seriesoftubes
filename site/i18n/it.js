@@ -728,7 +728,6 @@
 "Wants NetChill on-net: a cache or a PNI":"Vuole NetChill on-net: una cache o un PNI",
 "Backup generator in every city they touch":"Generatore di backup in ogni città che tocca",
 "Insists on two routers in their city":"Pretende due router nella sua città",
-"Local breakout: transit or an IX port in their own city":"Breakout locale: transit o una porta IX nella sua città",
 "Two data centers in every metro they touch":"Due data center in ogni area metropolitana che tocca",
 "Wants two different transit providers (or none at all)":"Vuole due provider di transit diversi (o nessuno)",
 "Needs low-loss reach into China":"Vuole raggiungere la Cina con poche perdite",
@@ -2266,4 +2265,5 @@
 "Snapshot only: one selected link fails. Other links on the same cable, trench or fabric stay up. Existing outages and routing rules still apply. No time, money or game state is changed.":"Solo un’istantanea: si interrompe il collegamento selezionato. Gli altri collegamenti sullo stesso cavo, scavo o fabric restano attivi. I guasti e le regole di routing esistenti si applicano comunque. Tempo, denaro e stato della partita non cambiano.",
 "What happens if this link fails right now?":"Cosa succede se questo collegamento si interrompe adesso?",
 "Check redundancy":"Verifica ridondanza",
+"Local breakout: transit or an IX port in their own city, or a local PNI while Tier 1":"Breakout locale: transit o una porta IX nella città del cliente, oppure un PNI locale quando sei Tier 1",
 };

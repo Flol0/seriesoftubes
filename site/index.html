@@ -1850,7 +1850,7 @@ const REQS={
  netchill:{l:tr('Wants NetChill on-net: a cache or a PNI'),bonus:.15,ok:()=>S.caches.some(c=>c.net==='nfx')||S.pni.some(p=>p.net==='nfx')},
  gen:{l:tr('Backup generator in every city they touch'),bonus:.15,ok:b=>[b.city,b.city2].filter(Boolean).every(c=>S.pops[c]&&S.pops[c].gen)},
  routers:{l:tr('Insists on two routers in their city'),bonus:.15,ok:b=>((S.pops[b.city]&&S.pops[b.city].routers)||1)>=2},
- local:{l:tr('Local breakout: transit or an IX port in their own city'),bonus:.2,ip:true,ok:b=>S.transit.some(t=>t.city===b.city)||hasIxAt(b.city)},
+ local:{l:tr('Local breakout: transit or an IX port in their own city, or a local PNI while Tier 1'),bonus:.2,ip:true,ok:b=>S.transit.some(t=>t.city===b.city)||hasIxAt(b.city)||(isTier1()&&S.pni.some(p=>p.city===b.city))},
  metro:{l:tr('Two data centers in every metro they touch'),bonus:.2,only:true,ok:b=>[b.city,b.city2].filter(Boolean).every(c=>S.pops[c]&&S.pops[c].site2)},
  twoup:{l:tr('Wants two different transit providers (or none at all)'),bonus:.15,ip:true,ok:()=>new Set(S.transit.map(t=>t.net)).size>=2||S.transit.length===0},
  china:{l:tr('Needs low-loss reach into China'),bonus:.3,ip:true,ok:()=>S.transit.some(t=>t.premium&&t.city==='hkg')||S.links.some(l=>l.premium)||S.pni.some(p=>NET[p.net].cn)},
