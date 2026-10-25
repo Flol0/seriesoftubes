@@ -475,3 +475,34 @@ test('#70 Goggle throttling in Russia no longer counts as traffic you failed to 
   assert.equal(ev("bizWhy(S.biz.find(b=>b.id==='gs')).length"), 0, 'no complaint about bandwidth');
   assert.deepEqual(errors, []);
 });
+
+test('#79 Benelux: Brussels red tape, the Flanders duopoly, Oostkamp trawlers and a wood-fired Bettembourg', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  for (const c of ['bru', 'oos', 'bet']) assert.equal(ev(`CITY.${c}.land`), 'eu');
+  // red tape: a pricier POP and pricier transit than Amsterdam
+  assert.equal(ev("popCost('bru')-popCost('ams')"), ev('BE_TAPE'));
+  assert.equal(ev("regionMult('bru')"), 1.5);
+  assert.equal(ev("regionMult('ams')"), 1);
+  // the duopoly: Belgian eyeballs barely grow until you advertise
+  ev("ACT.buildPop({city:'bru'});ACT.launchBB({city:'bru'});ACT.buildPop({city:'ams'});ACT.launchBB({city:'ams'})");
+  const grow = (ad) => ev(`(()=>{const p=S.pops.bru;p.bb.d=20;p.boost=${ad ? 'S.day+30' : '0'};R.cityDem={bru:1,ams:1};R.citySrv={bru:1,ams:1};const t=compute;compute=()=>{};S.day++;dayTick();compute=t;return S.pops.bru.bb.d-20;})()`);
+  const quiet = grow(false), loud = grow(true);
+  assert.ok(loud > quiet * 4, `an ad campaign cracks the duopoly (${quiet.toFixed(3)} vs ${loud.toFixed(3)})`);
+  // the new networks are reachable through Tier 1s, so Tier 1 players keep their reach
+  ev("S.transit=[];S.ixp={};S.pni=[];for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:'fra',tier:0});compute()");
+  for (const n of ['tny', 'pxm', 'bgs', 'cit', 'cms']) assert.equal(ev(`R.reachable.${n}`), true, `${n} reachable`);
+  // Clementine lands at Oostkamp; trawlers love it
+  assert.ok(ev("cablesFor('lon','oos').some(c=>c.cid==='clementine')"));
+  ev("ACT.buildPop({city:'lon'});ACT.buildPop({city:'oos'});S.links=[];UI.lmode='wave';UI.via='clementine';openLinkModal('lon','oos');ACT.buildLink({tier:1});closeModal()");
+  assert.equal(ev("S.links.length&&S.links[0].sub"), true);
+  const src = ev('fireFailure.toString()').replace(/^function fireFailure/, 'function');
+  ev('window.__ff=' + src.replace('type=pick(f);}', "type='cut';}"));
+  ev("for(let i=0;i<30&&!S.log.some(e=>/trawler|wind-farm/.test(e.t));i++){for(const l of S.links)l.cut=0;S.inc=[];__ff();}");
+  assert.ok(ev("S.log.some(e=>/trawler|wind-farm/.test(e.t))"), 'a North Sea boat found the cable');
+  // Bettembourg's chillers run on steam from burning waste wood
+  ev("S.pops={bet:{day:0,bb:null,boost:0,down:0,routers:1,gen:false,rgen:0}};window.__ac=" + src.replace('type=pick(f);}', "type='ac';}"));
+  ev("for(let i=0;i<20&&!S.log.some(e=>/waste-wood/.test(e.t));i++){S.pops.bet.hot=0;S.inc=[];__ac();}");
+  assert.ok(ev("S.log.some(e=>/waste-wood/.test(e.t))"), 'the forestry strike');
+  assert.deepEqual(errors, []);
+});

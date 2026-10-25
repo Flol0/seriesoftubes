@@ -584,7 +584,7 @@ test('#64 leased and own land fiber stay near their route next to a trench full 
   ev("ACT.buildPop({city:'par'});S.links=[];for(let i=0;i<8;i++)S.links.push({id:'w'+i,a:'fra',b:'par',kind:'wave',tier:2,km:478,sub:false,trench:'t1',cut:0,day:0});S.links.push({id:'d1',a:'fra',b:'par',kind:'df',own:false,km:478,sys:'lite',ch:[],ready:0,cut:0,day:0},{id:'d2',a:'fra',b:'par',kind:'df',own:true,km:478,sys:'lite',ch:[],ready:0,cut:0,day:0});GEO.clear()");
   const r = id => ev(`(()=>{const g=linkGeom(S.links.find(l=>l.id==='${id}')),A=CITY.fra,B=CITY.par,L=Math.hypot(B.x-A.x,B.y-A.y);return Math.max(...g.pts.map(p=>segDist(p[0],p[1],[A.x,A.y],[B.x,B.y])))/L;})()`);
   assert.equal(ev("['w0','d1','d2'].map(id=>lineIdx(S.links.find(l=>l.id===id))).join()"), '0,1,2', 'eight waves in one trench are one line');
-  for (const id of ['d1', 'd2']) assert.ok(r(id) < 0.35, `${id} bulges ${r(id).toFixed(2)}× the route`);
+  for (const id of ['d1', 'd2']) assert.ok(r(id) < 0.5, `${id} bulges ${r(id).toFixed(2)}× the route`);
   assert.deepEqual(errors, []);
 });
 

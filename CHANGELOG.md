@@ -6,21 +6,32 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.28.0-qol.1] — 2026-10-25
+
+- Updated to upstream 1.28.0 with the new Benelux cities and networks, retaining all local QoL improvements.
+
 ## [1.27.0-qol.2] — 2026-10-25
 
 - Updated to the latest upstream changes: incident-first NOC, caches across metro sites, Russian video demand correction, four North American cities, precise Tier 1 reach hints and waves joining existing routes. Local QoL improvements remain included.
-
-- Incidents now come first in the NOC, with the ones you can fix in one click at the top (#63). No more scrolling past hot ports and congested links to replace a broken optic.
-- Embedded caches can now sit in either building of a two-site metro (#69). A new box goes to the building with fewer of them, you can move boxes between A and B in the Peering tab, and a dark building only takes out the boxes inside it.
-- Customers in Russian cities no longer get unhappy because of Goggle's throttling (#70). People there simply get, and ask for, half as much Goggle video, so a well-built network serves the whole city again and the throttled half no longer fills your links.
-- Four new cities in North America: Kansas City, Calgary, Vancouver and Ottawa (#76). Canada gets two more big networks, Tell Us and Bodgers Communications, which you also reach through the Tier 1s they buy transit from. Ottawa's power grid is about as reliable as you would expect, and Canadian fiber has a new natural enemy.
-- Reach in the top bar no longer rounds up to 100% when it is just short, and the Goals tab now says why you are not Tier 1 right now (#73). Tier 1 needs more than 99.9% reach, so one small network out of reach is enough to lose the title.
-- New waves can join any route you already have between two cities, so two waves can run on the main route and two on the diverse one (#77). Each extra route shows up as its own choice, priced like the route it joins.
 
 ## [1.27.0-qol.1] — 2026-10-25
 
 - Updated to upstream 1.27.0, including the mobile NOC navigation fix, while retaining the local PNI finder, own-IX uplinks, PWA display fix, link redundancy checks and network reach filters.
 
+## [1.25.2-qol.1] — 2026-10-25
+
+- Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
+
+
+## [1.28.0] — 2026-10-25
+
+- Belgium and Luxembourg join the map: Brussels, Oostkamp and Bettembourg (#79). Belgian POPs and transit cost more, and Belgian homes stay with their two big ISPs unless you run an ad campaign there. Telenyet, Proxyminus, B.I.G.S., Citrus Belgium and CityMess join the networks, a new cable connects London to Oostkamp through some very busy fishing grounds, and Bettembourg's cooling depends on a steady supply of waste wood.
+- Four new cities in North America: Kansas City, Calgary, Vancouver and Ottawa (#76). Canada gets two more big networks, Tell Us and Bodgers Communications, which you also reach through the Tier 1s they buy transit from. Ottawa's power grid is about as reliable as you would expect, and Canadian fiber has a new natural enemy.
+- New waves can join any route you already have between two cities, so two waves can run on the main route and two on the diverse one (#77). Each extra route shows up as its own choice, priced like the route it joins.
+- Embedded caches can now sit in either building of a two-site metro (#69). A new box goes to the building with fewer of them, you can move boxes between A and B in the Peering tab, and a dark building only takes out the boxes inside it.
+- Reach in the top bar no longer rounds up to 100% when it is just short, and the Goals tab now says why you are not Tier 1 right now (#73). Tier 1 needs more than 99.9% reach, so one small network out of reach is enough to lose the title.
+- Customers in Russian cities no longer get unhappy because of Goggle's throttling (#70). People there simply get, and ask for, half as much Goggle video, so a well-built network serves the whole city again and the throttled half no longer fills your links.
+- Incidents now come first in the NOC, with the ones you can fix in one click at the top (#63). No more scrolling past hot ports and congested links to replace a broken optic.
 - Opening a link from the NOC on mobile now closes the NOC sheet so the link details are visible.
 
 ## [1.27.0] — 2026-10-25
@@ -65,17 +76,7 @@ All notable changes to this project are documented here. The project follows
 - The in-app "What's new" is shorter: the first sentence of each change, at most
   five, with a link to the full release notes on GitHub.
 
-## [1.25.2-qol.1] — 2026-10-25
-
-- Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
-
 ## [1.25.2] — 2026-10-25
-
-- Your own IX now supports extra router uplinks and the A/B/Both site controls. Uplinks use router ports, share the fabric capacity and keep working through a single-site outage when split across both sites (#36).
-
-- A PNI in the customer’s city now meets their local-breakout requirement while your network is Tier 1 (#20).
-
-- Retained the PNI directory, missing-POP deal navigation, installed-app HUD fix and on-demand link redundancy checks.
 
 - Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a
   cable landing station, pay a frankly rude amount of money, wait while a cable
@@ -655,28 +656,3 @@ First public release.
 - Dozens of failure types and geopolitical events, a NOC with an event log, and
   a NOC dashboard with traffic, money and per-ASN graphs.
 - Cookieless Ridiculytics analytics on the live site only.
-
-## Earlier local test builds
-
-### [1.25.1-qol.2] — 2026-10-25
-
-- Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network.
-
-### [1.25.1-qol.1] — 2026-10-25
-
-- A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
-
-
-
-
-### [1.23.0-pwa.3] — 2026-10-25
-
-- Find PNI locations from the Networks list and NOC traffic table, with your POPs first and city shortcuts. The mobile tab bar remains accessible (#12).
-
-### [1.23.0-pwa.2] — 2026-10-25
-
-- Installed apps paint a solid top edge from startup, without needing to open the bank first.
-
-### [1.23.0-pwa.1] — 2026-10-25
-
-- Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport.
