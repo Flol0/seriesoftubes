@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.25.1-qol.1] — 2026-10-25
+
+- A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
+
 ## [1.25.1] — 2026-10-25
 
 - Once you have half a billion in the bank, the banks stop sending loan offers

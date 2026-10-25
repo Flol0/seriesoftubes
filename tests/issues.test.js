@@ -563,3 +563,18 @@ test('#12 PNI discovery lists physical presence, marks own POPs and opens the ci
  ev(`NET['${id}'].pops=[];ACT.pniFind({net:'${id}'})`);assert.match(dom.window.document.getElementById('modalCard').textContent,/No PNI locations listed/);
  assert.deepEqual(errors,[]);
 });
+
+test('deal navigation visits the first missing POP, including second endpoints and multi-site offers',()=>{
+ const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.speed=0;UI.left='deals';UI.leftOpen=true;S.offers=[{id:'route',type:'l2vpn',name:'Missing POP circuit',city:'fra',city2:'bde',bw:10,rate:1000,reqs:[],exp:30}];renderLeft()");
+ const go=()=>dom.window.document.querySelector('#leftBody [data-act="focusCity"]');
+ assert.equal(JSON.parse(go().dataset.args).city,'bde');
+ ev(`ACT.focusCity(${go().dataset.args})`);assert.equal(ev('UI.sel.id'),'bde');assert.equal(ev('!!S.pops.bde'),false,'navigation does not buy a POP');
+ ev("S.pops.bde={routers:1,rgen:0};delete S.pops.fra;renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'fra','the first endpoint can also be missing');
+ ev("delete S.pops.bde;renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'fra','both missing uses the first required city');
+ ev("S.pops.fra={routers:1,rgen:0};S.offers[0].type='sdwan';S.offers[0].city2=null;S.offers[0].sites=['fra','ams','par'];window.innerWidth=360;renderLeft()");
+ assert.equal(JSON.parse(go().dataset.args).city,'ams');
+ ev("S.pops.ams={routers:1,rgen:0};renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'par');
+ ev("S.pops.par={routers:1,rgen:0};renderLeft()");assert.equal(go(),null);assert.ok(dom.window.document.querySelector('#leftBody [data-act="accept"]'));
+ ev("S.offers[0].type='l2vpn';delete S.offers[0].sites;S.offers[0].city='bde';renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'bde','single-site offers still work');
+ assert.deepEqual(errors,[]);
+});
