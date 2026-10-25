@@ -18,7 +18,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.25.1">
+<meta name="generator" content="Series of Tubes 1.25.1-qol.1">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.25.1",
+  "softwareVersion": "1.25.1-qol.1",
   "dateModified": "2026-10-25",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -556,7 +556,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.25.1"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.25.1-qol.1"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -574,9 +574,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.25.1';
+const APP_VERSION='1.25.1-qol.1';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Once you have half a billion in the bank, the banks stop sending loan offers (#52). They come back if your cash drops below that again."];
+const RELEASE_NOTES=["A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
@@ -2833,7 +2833,7 @@ function renderLeft(){checkLayer();
     if(!S.offers.length)h+=`<p class="empty">${tr('No open offers right now. Businesses look for networks with POPs in their city. New ones pop up every few weeks.')}</p>`;
     for(const o of S.offers.slice().sort((a,b)=>a.exp-b.exp)){const has=bHas(o);
       h+=`<div class="row"><div class="grow"><div class="nm">${esc(o.name)}</div><div class="meta">${esc(BIZ_T[o.type].l)} · ${CITY[o.city].name}${o.city2?' ⇄ '+CITY[o.city2].name:''} · <b>${bTerms(o)}</b> · ${tr('{n}d left',{n:o.exp-S.day})}${(o.reqs||[]).length?` · ${trn('{n} special requirement','{n} special requirements',o.reqs.length)}`:''}</div>${reqList(o)}
-      <div class="btns">${has?btn(tr('Accept'),'accept',{id:o.id},'green sm'):btn(tr('Go there'),'focusCity',{city:o.city},'ghost sm')}${btn(tr('Decline'),'decline',{id:o.id},'ghost sm')}</div>${has?'':`<div class="why">${tr('Needs a POP in {cities}',{cities:bCities(o).filter(x=>!S.pops[x]).map(x=>CITY[x].name).join(', ')})}</div>`}</div></div>`;}
+      <div class="btns">${has?btn(tr('Accept'),'accept',{id:o.id},'green sm'):btn(tr('Go there'),'focusCity',{city:bCities(o).find(c=>!S.pops[c])},'ghost sm')}${btn(tr('Decline'),'decline',{id:o.id},'ghost sm')}</div>${has?'':`<div class="why">${tr('Needs a POP in {cities}',{cities:bCities(o).filter(x=>!S.pops[x]).map(x=>CITY[x].name).join(', ')})}</div>`}</div></div>`;}
   }else if(UI.left==='noc'){
     h+=`<div class="btns" style="margin-bottom:8px">${btn(tr('Open NOC dashboard'),'dash',{},'pink')}${btn(tr('Connections'),'connOpen',{},'')}${btn(tr('Traceroute'),'trace',{},'')}</div>`;
     h+=`<p class="lead">${tr('Your Network Operations Center. Every notification also lands here. Things fail all the time on the internet. Redundant links and multiple upstreams let traffic reroute by itself.')}</p>`;

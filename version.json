@@ -1,7 +1,7 @@
 {
-  "version": "1.25.1",
+  "version": "1.25.1-qol.1",
   "date": "2026-10-25",
   "notes": [
-    "Once you have half a billion in the bank, the banks stop sending loan offers (#52). They come back if your cash drops below that again."
+    "A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve."
   ]
 }
