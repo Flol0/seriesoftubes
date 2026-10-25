@@ -18,7 +18,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.23.0-pwa.1">
+<meta name="generator" content="Series of Tubes 1.23.0-pwa.2">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.23.0-pwa.1",
+  "softwareVersion": "1.23.0-pwa.2",
   "dateModified": "2026-10-25",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -116,6 +116,7 @@ button{font:inherit;color:inherit}
 /* HUD */
 #hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;pointer-events:none;z-index:5}
 #hud>*{pointer-events:auto}
+#appTopEdge{display:none}
 .chip{background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);padding:3px 11px;display:flex;flex-direction:column;justify-content:center;min-height:46px}
 .chip .lbl{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
 .chip .val{font-family:var(--display);font-weight:800;font-size:19px;line-height:1.05;white-space:nowrap}
@@ -449,6 +450,8 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 /* Installed as an app: no browser chrome, so leave room for the notch and the home indicator. */
 @media (display-mode: standalone){
   body{background:#57C4E5}
+  /* Give WebKit a solid fixed top edge before any dialog is opened. */
+  #appTopEdge{display:block;position:fixed;top:0;left:0;right:0;height:max(6px,env(safe-area-inset-top,0px));background:var(--sea);pointer-events:none;z-index:4}
 }
 /* Whatever the language, the HUD stays on one row: fitHud() drops chips until it fits. */
 #hud.fit1 .hide-md2,#hud.fit2 .hide-md{display:none !important}
@@ -497,6 +500,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
   </div>
 </noscript>
 <canvas id="map" aria-label="World map of your network"></canvas>
+<div id="appTopEdge" aria-hidden="true"></div>
 
 <header id="hud">
   <button class="chip brand menubtn" data-act="menu" aria-label="Network menu: save, load or start over">
@@ -551,7 +555,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.23.0-pwa.1"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.23.0-pwa.2"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -569,9 +573,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.23.0-pwa.1';
+const APP_VERSION='1.23.0-pwa.2';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport."];
+const RELEASE_NOTES=["Installed apps paint a solid top edge from startup, without needing to open the bank first."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
