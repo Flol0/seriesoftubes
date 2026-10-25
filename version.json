@@ -1,7 +1,7 @@
 {
-  "version": "1.28.0-qol.2",
+  "version": "1.28.0-qol.3",
   "date": "2026-10-25",
   "notes": [
-    "Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included."
+    "Updated to the latest upstream router trade-ins, daily swap limit, speed-based requirements and gentler link bends. Local QoL improvements remain included."
   ]
 }

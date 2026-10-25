@@ -18,7 +18,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.28.0-qol.2">
+<meta name="generator" content="Series of Tubes 1.28.0-qol.3">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.28.0-qol.2",
+  "softwareVersion": "1.28.0-qol.3",
   "dateModified": "2026-10-25",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -556,7 +556,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.28.0-qol.2"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.28.0-qol.3"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -574,9 +574,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.28.0-qol.2';
+const APP_VERSION='1.28.0-qol.3';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included."];
+const RELEASE_NOTES=["Updated to the latest upstream router trade-ins, daily swap limit, speed-based requirements and gentler link bends. Local QoL improvements remain included."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
@@ -657,6 +657,8 @@ const SLOW_BOOT=[tr('is oinking through the self-test of every PacketOinker on e
 function slowBoot(c){const p=S.pops[c];if(!p)return false;const g=p.rgen||0;return hstr(c+'|boot|'+g+'|'+S.asn)%100<RG[g].slowP;}
 function bootMin(c){const p=S.pops[c],G=RG[(p&&p.rgen)||0];return slowBoot(c)?G.boot*9+40:G.boot;}
 const routerCost=g=>Math.round(ROUTER_COST+RG[g].cost*0.8);
+// Old routers go on eBuy when you swap models or remove one (#82), like spare optics (#45). Chassis age faster.
+const ROUTER_RESALE=0.3,tradeIn=(g,n)=>Math.round(RG[g].cost*n*ROUTER_RESALE),swapCost=(c,g)=>{const p=S.pops[c],rt=p.routers||1;return Math.max(0,RG[g].cost*rt-tradeIn(p.rgen||0,rt));};
 const RMAX=6;
 // The plain, badge-less model of each class is the default upgrade path; the others are side-grades.
 const mainRG=k=>RG.findIndex(r=>r.cls===k&&!r.badge);
@@ -1907,7 +1909,7 @@ function sanitize(s){
   s.priceMul=num(s.priceMul,1);s.nextFail=num(s.nextFail,s.day+45);s.nextEvent=num(s.nextEvent,s.day+40);s.lvl=int(s.lvl,1,LEVELS.length,1);s.neg=int(s.neg,0,1e7,0);s.loanStrikes=int(s.loanStrikes,0,1e3,0);
   for(const k of Object.keys(s.stats)){const v=s.stats[k];if(k==='by'||k==='f'){if(!v||typeof v!=='object')s.stats[k]={};else for(const j of Object.keys(v))v[j]=num(v[j],0);}else if(typeof v!=='boolean')s.stats[k]=num(v,0);}
   for(const k of ['survived','incidents','peak'])s.stats[k]=num(s.stats[k],0);
-  for(const c of Object.keys(s.pops)){const p=s.pops[c];if(!isCity(c)||!p||typeof p!=='object'){delete s.pops[c];continue;}p.routers=int(p.routers,1,RMAX,1);if(p.rgen!==undefined)p.rgen=int(p.rgen,0,RG.length-1,0);p.down=num(p.down,0);if(p.bb&&typeof p.bb==='object')p.bb.d=num(p.bb.d,0);else p.bb=null;}
+  for(const c of Object.keys(s.pops)){const p=s.pops[c];if(!isCity(c)||!p||typeof p!=='object'){delete s.pops[c];continue;}p.routers=int(p.routers,1,RMAX,1);if(p.rupDay!==undefined)p.rupDay=num(p.rupDay,-1);if(p.rgen!==undefined)p.rgen=int(p.rgen,0,RG.length-1,0);p.down=num(p.down,0);if(p.bb&&typeof p.bb==='object')p.bb.d=num(p.bb.d,0);else p.bb=null;}
   if(!isCity(s.home))s.home=Object.keys(s.pops)[0]||'fra';
   const tier=v=>int(v,0,PORT.length-1,0),lag=v=>int(v,1,LAG_MAX,1),sid=v=>String(v==null?uid():v).slice(0,40);
   s.links=s.links.filter(l=>l&&isCity(l.a)&&isCity(l.b)&&l.a!==l.b).map(l=>{l.id=sid(l.id);l.km=num(l.km,kmBetween(l.a,l.b));l.mo=num(l.mo,0);l.cut=num(l.cut,0);if(l.pairs!==undefined)l.pairs=Math.min(l.sub?SUB_PAIRS_MAX:s.lvl>=PAIRS_LV?PAIRS_BIG:PAIRS_MAX,Math.max(1,Math.floor(+l.pairs)||1));if(l.kind!=='df'&&l.kind!=='vxc')l.kind='wave';if(l.kind==='wave')l.tier=int(l.tier,0,LT.length-1,0);if(l.cable&&!own(CAB,l.cable))l.cable=null;if(l.kind==='vxc'&&!own(VXC,l.vt))l.vt=0;if(l.kind==='df'){if(!own(DF_SYS,l.sys))l.sys='lite';l.ch=Array.isArray(l.ch)?l.ch.filter(o=>own(OPT,o)):[];l.ready=num(l.ready,0);l.regen=int(l.regen,0,REGEN_MAX,0);}const deg=v=>v&&typeof v==='object'?{until:num(v.until,0),f:Math.min(1,Math.max(0,num(v.f,1)))}:null;if(l.loss)l.loss=deg(l.loss);if(l.metric&&!own(MET,l.metric))l.metric='normal';return l;});
@@ -2089,10 +2091,10 @@ const onSite=(site,s)=>(site||'a')===s||site==='ab';
 function siteCtl(k,id,c,cur){const p=S.pops[c];if(!p||!p.site2)return '';cur=cur||'a';const n=k==='t'?(S.transit.find(x=>x.id===id)||{}).n:k==='p'?(S.pni.find(x=>x.id===id)||{}).n:(S.ixn||{})[id];return `<div class="seg site"><span class="meta">${tr('Site:')}</span>${['a','b'].map(x=>btn(`${x.toUpperCase()} <small>${esc(siteName(c,x))}</small>`,'siteSet',{k,id,s:x},cur===x?'pink sm':'ghost sm')).join('')}${btn((n||1)<2?tr('Both <small>adds a LAG member</small>'):tr('Both <small>split the LAG</small>'),'siteSet',{k,id,s:'ab'},cur==='ab'?'pink sm':'ghost sm')}</div>`;}
 function portOk(c,i){const p=S.pops[c];return i<=RG[p?(p.rgen||0):0].maxP;}
 function waveOk(a,b,i){return [a,b].every(c=>i<=RG[S.pops[c]?(S.pops[c].rgen||0):0].maxLT);}
-function waveNeed(i){const g=RG.find(r=>r.maxLT>=i);return g?g.n:'?';}
+function waveNeed(i){const g=RG.find(r=>r.maxLT>=i);return g?tr('{pn} routers',{pn:g.pn}):'?';}
 function routerModels(c){const p=S.pops[c],g=p.rgen||0,rt=p.routers||1;
   return `<div style="margin-top:6px">${RG.map((M,i)=>{if(i===g)return '';const why=modelFits(c,i),lk=M.lvl>lvl();
-    return `<div class="row"><span class="logo" style="--c:${M.badge?'#2C7A7B':'#FF4F9A'}">${M.badge||'R'+(M.cls+1)}</span><div class="grow"><div class="nm">${esc(M.n)} <span class="meta">${M.pn} · ${tr('{n} ports',{n:M.ports})} · ${fmtG(M.cap)} · ${tr('boots in ~{n} min',{n:M.boot})}${M.flaky?' · '+tr('crashes more'):''}</span></div><div class="meta">${esc(M.blurb)}</div>${why?`<div class="why">${esc(why)}</div>`:''}</div>${btn(lk?tr('Level {n}',{n:M.lvl}):tr('Swap <small>{cost} + {mo}/mo</small>',{cost:fmt$(M.cost*rt),mo:fmt$(M.mo*rt)}),'upRouter',{city:c,g:i},'sm',lk||!!why||S.cash<M.cost*rt)}</div>`;}).join('')}</div>`;}
+    return `<div class="row"><span class="logo" style="--c:${M.badge?'#2C7A7B':'#FF4F9A'}">${M.badge||'R'+(M.cls+1)}</span><div class="grow"><div class="nm">${esc(M.n)} <span class="meta">${M.pn} · ${tr('{n} ports',{n:M.ports})} · ${fmtG(M.cap)} · ${tr('boots in ~{n} min',{n:M.boot})}${M.flaky?' · '+tr('crashes more'):''}</span></div><div class="meta">${esc(M.blurb)}</div>${why?`<div class="why">${esc(why)}</div>`:''}</div>${btn(lk?tr('Level {n}',{n:M.lvl}):tr('Swap <small>{cost} + {mo}/mo</small>',{cost:fmt$(swapCost(c,i)),mo:fmt$(M.mo*rt)}),'upRouter',{city:c,g:i},'sm',lk||!!why||S.cash<swapCost(c,i)||p.rupDay===S.day)}</div>`;}).join('')}</div>`;}
 function portNote(c){const p=S.pops[c];if(!p)return '';const g=p.rgen||0;return RG[g].maxP<PORT.length-1?`<p class="note" style="margin-top:0">${tr('Your {model} here tops out at {pn} ports. Bigger ports need a router upgrade (Infra tab).',{model:esc(RG[g].n),pn:RG[g].pn})}</p>`:'';}
 function sfOf(r,c){const d=r.cityDem[c]||0;return d<=1e-6?1:clamp(r.citySrv[c]/d,0,1);}
 
@@ -2685,7 +2687,7 @@ const ACT={
    floater(CITY[o.city].x,CITY[o.city].y-30,tr('Signed!'),'#16A866');sfx('coin');after();},
  decline:({id})=>{S.offers=S.offers.filter(x=>x.id!==id);after();},
  dropBiz:({id})=>{const b0=S.biz.find(x=>x.id===id);if(!b0)return;if(BIZ_T[b0.type].event&&S.day>=b0.start){toast(tr('<b>The event is already running.</b><br>The organisers will not let you walk out now.'),'bad');sfx('err');return;}if(UI.confirm!==id){UI.confirm=id;renderPanel();return;}S.biz=S.biz.filter(b=>b.id!==id);UI.confirm=null;after();},
- upLink:({id,tier})=>{tier=+tier;const l=S.links.find(x=>x.id===id);if(!l||l.kind!=='wave'||!LT[tier]||tier<=l.tier)return;{const w=subWaveWhy(tier,l.km,l.sub);if(w){toast(tr('<b>No {wave} waves on this cable.</b><br>{why}',{wave:LT[tier].n,why:esc(w)}),'bad');sfx('err');return;}}if(!waveOk(l.a,l.b,tier)){toast(tr('<b>A {wave} wave needs {need} routers at both ends.</b>',{wave:LT[tier].n,need:esc(waveNeed(tier))}),'bad');sfx('err');return;}const nm=Math.round(waveMo(l.km,l.sub,tier)*(l.mult||1));if(!spend(nm))return;l.mo=nm;l.tier=tier;after();},
+ upLink:({id,tier})=>{tier=+tier;const l=S.links.find(x=>x.id===id);if(!l||l.kind!=='wave'||!LT[tier]||tier<=l.tier)return;{const w=subWaveWhy(tier,l.km,l.sub);if(w){toast(tr('<b>No {wave} waves on this cable.</b><br>{why}',{wave:LT[tier].n,why:esc(w)}),'bad');sfx('err');return;}}if(!waveOk(l.a,l.b,tier)){toast(tr('<b>A {wave} wave needs {need} at both ends.</b>',{wave:LT[tier].n,need:esc(waveNeed(tier))}),'bad');sfx('err');return;}const nm=Math.round(waveMo(l.km,l.sub,tier)*(l.mult||1));if(!spend(nm))return;l.mo=nm;l.tier=tier;after();},
  decomOpen:({city})=>{UI.decom=new Set(city&&S.pops[city]?[city]:[]);decomModal();},
  decomToggle:({city})=>{if(!S.pops[city])return;UI.decom=UI.decom||new Set();if(UI.decom.has(city))UI.decom.delete(city);else UI.decom.add(city);decomModal();},
  decomGo:()=>{const sel=[...(UI.decom||[])].filter(c=>S.pops[c]);if(!sel.length||sel.length>=Object.keys(S.pops).length)return;closeModal();UI.decom=null;UI.sel=null;decommission(sel);sfx('alert');after();},
@@ -2697,7 +2699,7 @@ const ACT={
    S.myIx[city]={name:nm,members:[],next:S.day+4};S.ixp[city]=2;toast(tr('<b>You founded {ix}!</b><br>Networks will join over time and pay you for ports. Open members peer with you for free.',{ix:esc(nm)}),'goal');after();},
  buildLink:({tier})=>{tier=+tier;const p=UI.pending;if(!p)return;const {a,b}=p;const km=kmBetween(a,b),sub=isSub(a,b),sib=pairLinks(a,b).filter(l=>l.kind!=='vxc'),jn=sib.length?routeJoin(a,b):null,same=!!jn,border=cnCity(a)!==cnCity(b),mult=(sib.length&&!(jn&&jn.k===(landTrenches(a,b)[0]||{}).k)?DIVERSE:1)*(border?3*(UI.cnPrem&&(a==='hkg'||b==='hkg')?1.6:1):1);
    if((cnCity(a)||cnCity(b))&&!cnOk())return;
-   if(!waveOk(a,b,tier)){toast(tr('<b>A {wave} wave needs {need} routers at both ends.</b>',{wave:LT[tier].n,need:esc(waveNeed(tier))}),'bad');sfx('err');return;}
+   if(!waveOk(a,b,tier)){toast(tr('<b>A {wave} wave needs {need} at both ends.</b>',{wave:LT[tier].n,need:esc(waveNeed(tier))}),'bad');sfx('err');return;}
    const wr=waveRoute(a,b,mult,border);if(!wr){toast(tr('<b>No cable available for that route right now.</b>'),'bad');sfx('err');return;}{const w=subWaveWhy(tier,wr.km,wr.sub);if(w){toast(tr('<b>No {wave} waves on this cable.</b><br>{why}',{wave:LT[tier].n,why:esc(w)}),'bad');sfx('err');return;}}const base=Math.round(waveMo(wr.km,wr.sub,tier)*wr.wm),cost=base+(S.pops[b]?0:popCost(b));
    if(!portGate(a,1)||!portGate(b,1))return;if(!spend(cost))return;if(!S.pops[b])S.pops[b]={day:S.day,bb:null,boost:0,down:0,routers:1,gen:false};
    const id=uid();const l={id,a,b,kind:'wave',border,premium:border&&!!UI.cnPrem&&(a==='hkg'||b==='hkg'),tier,km:wr.km,sub:wr.sub,cable:wr.cab,mo:base,mult:wr.wm,trench:wr.cab?'cab:'+wr.cab:(jn?jn.k:id),cut:0,day:S.day};S.links.push(l);closeModal();
@@ -2755,9 +2757,9 @@ const ACT={
  addParallel:({id})=>{const l=S.links.find(x=>x.id===id);if(l)openLinkModal(l.a,l.b);},
  addRouter:({city})=>{const p=S.pops[city];if(!p||(p.routers||1)>=RMAX)return;if(!spend(routerCost(p.rgen||0)))return;p.routers=(p.routers||1)+1;floater(CITY[city].x,CITY[city].y-30,tr('Router added'),'#FF4F9A');after();},
  models:()=>{UI.models=!UI.models;renderPanel();},
- rmRouter:({city})=>{const p=S.pops[city];if(!p||(p.routers||1)<=1)return;if(portsUsed(city)>portsMax(city,undefined,p.routers-1)){toast(tr('<b>Unplug something first.</b><br>{used} ports are in use, and one router fewer only has {max}.',{used:fmtPorts(portsUsed(city)),max:portsMax(city,undefined,p.routers-1)}),'bad');sfx('err');return;}p.routers--;after();},
+ rmRouter:({city})=>{const p=S.pops[city];if(!p||(p.routers||1)<=1)return;if(portsUsed(city)>portsMax(city,undefined,p.routers-1)){toast(tr('<b>Unplug something first.</b><br>{used} ports are in use, and one router fewer only has {max}.',{used:fmtPorts(portsUsed(city)),max:portsMax(city,undefined,p.routers-1)}),'bad');sfx('err');return;}p.routers--;{const back=tradeIn(p.rgen||0,1);if(back>0){S.cash+=back;toast(tr('<b>Sold a {model} on eBuy.</b><br>{price} back.',{model:esc(RG[p.rgen||0].n),price:fmt$(back)}),'good');}}after();},
  upRouter:({city,g})=>{const p=S.pops[city];if(!p)return;g=g===undefined?mainRG(RG[p.rgen||0].cls+1):+g;if(!RG[g]||g===(p.rgen||0))return;{const why=modelFits(city,g);if(why){toast(tr("<b>The {model} won't fit.</b><br>{why}",{model:esc(RG[g].n),why:esc(why)}),'bad');sfx('err');return;}}if(RG[g].lvl>lvl()){toast(tr('<b>{model} unlocks at customer level {lv}.</b>',{model:esc(RG[g].n),lv:RG[g].lvl}),'bad');sfx('err');return;}
-   const rt=p.routers||1;if(!spend(RG[g].cost*rt))return;p.rgen=g;
+   const rt=p.routers||1,old=p.rgen||0;if(p.rupDay===S.day){toast(tr('<b>The new routers in {city} are still being racked.</b><br>One swap a day: try again tomorrow.',{city:CITY[city].name}),'bad');sfx('err');return;}const back=tradeIn(old,rt);if(!spend(swapCost(city,g)))return;p.rgen=g;p.rupDay=S.day;if(back>0)toast(tr('<b>Sold the old {model} on eBuy.</b><br>{price} back toward the new gear.',{model:esc(RG[old].n),price:fmt$(back)}),'good');
    if(rt===1){const sl=slowBoot(city),dd=sl?3:1;p.down=Math.max(p.down||0,S.day+dd);addInc({type:'maint',ref:city,until:S.day+dd,msg:sl?tr('Swapping the only router in {city} for a {model}. The new one {how}. Back in {n} days.',{city:CITY[city].name,model:RG[g].n,how:pick(SLOW_BOOT),n:dd}):tr('Swapping the only router in {city} for a {model}. Maintenance window: back tomorrow.',{city:CITY[city].name,model:RG[g].n}),cost:0});toast(`<b>${tr('Maintenance window in {city}',{city:CITY[city].name})}</b><br>${sl?tr('One router, and this one takes forever to boot. Back in {n} days.',{n:dd}):tr('One router means downtime during the swap. Back tomorrow.')}`,'bad');}
    else toast(tr('<b>Rolling upgrade in {city}</b><br>{n} × {model}, swapped one at a time. Zero downtime.',{city:CITY[city].name,n:rt,model:esc(RG[g].n)}),'good');
    floater(CITY[city].x,CITY[city].y-30,RG[g].n+'!','#FF4F9A');after();},
@@ -2846,7 +2848,7 @@ function pairBtn(l){if(!l.own||!isRdm(l.sys)||l.ready>S.day)return '';const n=Ma
   const full=(l.ch||[]).length+soldSlots(l)>=chMax(l),c=pairCost(l);return btn(l.sub?tr('Light fiber pair {n} <small>{price}</small>',{n:n+1,price:fmt$(c)}):tr('Light fiber pair {n} <small>{price} + {mo}/mo</small>',{n:n+1,price:fmt$(c),mo:fmt$(ampCount(l.km)*AMP_MO)}),'addPair',{id:l.id},full?'pink sm':'ghost sm',!full||S.cash<c);}
 function chWhy(l,o){const O=OPT[o];if(O.lvl>lvl())return tr('Unlocks at customer level {n}.',{n:O.lvl});if(O.sys==='roadm'&&!isRdm(l.sys))return tr('Needs a ROADMaster 9000 line system.');if(!optMode(o,l)){const mx=reachOn((O.modes||[[0,O.reach]]).at(-1)[1],l.sub);return tr('Too far even at its slowest setting: an optical span here is {span} km and it reaches {max} km. Add a regen site (Line system).',{span:spanKm(l).toLocaleString(),max:mx.toLocaleString()});}
   if((l.ch||[]).length+soldSlots(l)>=chMax(l))return soldSlots(l)?tr('{sys} is full ({max} channels, {sold} sold to customers).',{sys:DF_SYS[l.sys].n,max:chMax(l),sold:soldSlots(l)}):tr('{sys} is full ({max} channels).',{sys:DF_SYS[l.sys].n,max:chMax(l)});
-  for(const c of [l.a,l.b]){const p=S.pops[c];if(p&&RG[p.rgen||0].cls<O.rg)return tr('Needs {model} routers at both ends ({city}).',{model:RG[mainRG(O.rg)].n,city:CITY[c].name});}return '';}
+  for(const c of [l.a,l.b]){const p=S.pops[c];if(p&&RG[p.rgen||0].cls<O.rg)return tr('Needs routers with {pn} ports or bigger at both ends ({city}).',{pn:RG[mainRG(O.rg)].pn,city:CITY[c].name});}return '';}
 function bbCost(c){return 15000+CITY[c].P*20;}
 function after(){if(S)purgeInc();compute();checkGoals();renderAll();if(S&&!$('dash').hidden)renderDash();save();}
 const isTablet=()=>innerWidth>760&&innerWidth<=1200;
@@ -3106,9 +3108,9 @@ function cityPanel(c){
     <div class="kv"><span>${tr('Forwarding chip')}</span><b>${esc(G.chip)}</b></div><div class="kv"><span>${tr('Boot time')}</span><b>${slowBoot(c)?`<span style="color:var(--bad)">${tr('~{n} min · a slow one',{n:bootMin(c)})}</span>`:tr('~{n} min',{n:bootMin(c)})}</b></div>${slowBoot(c)?`<p class="note">${tr('This chassis takes forever to boot: crashes last longer, and swapping the only router here takes 3 days. A second router hides it.')}</p>`:''}
     <div class="kv"><span>${tr('Forwarding load')}</span><b>${fmtG(nl)} / ${fmtG(nc)}</b></div><div class="bar ${barCls(nl/nc)}"><i style="width:${Math.min(100,nl/nc*100)}%"></i></div>
     ${nl>=nc*0.95?`<p class="why">${tr('Maxed out. Traffic here is being dropped.')}</p>`:''}
-    <div class="btns">${N?btn(N.lvl>lvl()?tr('{model} <small>level {lv}</small>',{model:esc(N.n),lv:N.lvl}):tr('Upgrade to {model} <small>{cost} + {mo}/mo</small>',{model:esc(N.n),cost:fmt$(N.cost*rt),mo:fmt$(N.mo*rt)}),'upRouter',{city:c,g:Ni},'pink',N.lvl>lvl()||S.cash<N.cost*rt):''}${btn(UI.models?tr('Hide other models'):tr('Other models'),'models',{},'ghost sm')}${rt<RMAX?btn(tr('Add router <small>{cost} + {mo}/mo</small>',{cost:fmt$(routerCost(g)),mo:fmt$(ROUTER_MO+G.mo)}),'addRouter',{city:c},'',S.cash<routerCost(g)):''}${rt>1?btn(tr('Remove one'),'rmRouter',{city:c},'ghost sm'):''}</div>
+    <div class="btns">${N?btn(N.lvl>lvl()?tr('{model} <small>level {lv}</small>',{model:esc(N.n),lv:N.lvl}):tr('Upgrade to {model} <small>{cost} + {mo}/mo</small>',{model:esc(N.n),cost:fmt$(swapCost(c,Ni)),mo:fmt$(N.mo*rt)}),'upRouter',{city:c,g:Ni},'pink',N.lvl>lvl()||S.cash<swapCost(c,Ni)||p.rupDay===S.day):''}${btn(UI.models?tr('Hide other models'):tr('Other models'),'models',{},'ghost sm')}${rt<RMAX?btn(tr('Add router <small>{cost} + {mo}/mo</small>',{cost:fmt$(routerCost(g)),mo:fmt$(ROUTER_MO+G.mo)}),'addRouter',{city:c},'',S.cash<routerCost(g)):''}${rt>1?btn(tr('Remove one'),'rmRouter',{city:c},'ghost sm'):''}</div>
     ${UI.models?routerModels(c):''}
-    ${N||UI.models?`<p class="note">${rt>1?tr('Rolling upgrade: one router at a time, no downtime.'):tr('With one router, the upgrade needs a maintenance window: this POP goes dark for a day.')}</p>`:''}
+    ${N||UI.models?`<p class="note">${(p.rgen||0)>0?tr('Prices include {p} back for the old routers on eBuy.',{p:fmt$(tradeIn(p.rgen||0,rt))})+' ':''}${p.rupDay===S.day?tr('New routers went in today. The next swap can wait until tomorrow.')+' ':''}${rt>1?tr('Rolling upgrade: one router at a time, no downtime.'):tr('With one router, the upgrade needs a maintenance window: this POP goes dark for a day.')}</p>`:''}
     <p class="note">${rt>=2?tr('A crash here only costs one router’s capacity for a few days.'):tr('One router is a single point of failure.')}</p></section>
     <section><h3>${tr('Metro diversity')}</h3>${p.site2?(()=>{const up=s=>[...S.transit.filter(t=>t.city===c&&onSite(t.site,s)).map(t=>tr('{net} transit',{net:NET[t.net].name})+(t.site==='ab'?' '+tr('(split)'):'')),...S.pni.filter(x=>x.city===c&&onSite(x.site,s)).map(x=>'PNI '+NET[x.net].name+(x.site==='ab'?' '+tr('(split)'):'')),...ixIdsIn(c).filter(x=>S.ixp[x]!==undefined&&onSite((S.ixSite||{})[x],s)).map(x=>tr('{port} port',{port:ixName(x)})+((S.ixSite||{})[x]==='ab'?' '+tr('(split)'):'')),...S.caches.filter(x=>x.city===c&&(x.site==='b'?'b':'a')===s).map(x=>NET[x.net].cache.name)];
       const row=s=>{const dn=siteDown(c,s),u=up(s);return `<div class="row"><span class="logo" style="--c:${s==='a'?'#FF4F9A':'#7B61FF'}">${s.toUpperCase()}</span><div class="grow"><div class="nm">${esc(siteName(c,s))}${dn?' <span class="tag restrictive">DOWN</span>':''}</div><div class="meta">${u.length?esc(u.join(', ')):tr('Nothing plugged in here yet')}</div></div></div>`;};
@@ -3828,14 +3830,17 @@ function drawCables(ks){const z=cam.z,selC=UI.drag&&UI.drag.mode==='link'?UI.dra
       ctx.globalAlpha=1;}}}
 function bezGeom(l,at){const A=CITY[l.a],B=CITY[l.b];const i=at!==undefined?at:lineIdx(l);const key=l.id+'|b'+i;const hit=GEO.get(key);if(hit)return hit;
   const bx=A.x+wrapDx(A.x,B.x),by=B.y;const dx=bx-A.x,dy=by-A.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(ny>0){nx=-nx;ny=-ny;}
-  const base=Math.max(10,Math.min(len*0.13,110)),step=Math.min(16,len*.06),off0=i<=0?base:(i%2?-1:1)*(base*(i%2?0.2:1)+Math.ceil(i/2)*step);
+  const base=Math.max(4,Math.min(len*0.1,90)),step=Math.min(16,len*.06),off0=i<=0?base:(i%2?-1:1)*(base*(i%2?0.2:1)+Math.ceil(i/2)*step);
   const mx=(A.x+bx)/2,my=(A.y+by)/2;
   const obs=CITIES.filter(c=>c.id!==l.a&&c.id!==l.b).map(c=>[mx+wrapDx(mx,c.x),c.y]);
   const clear=(cx,cy)=>{let m=Infinity;const g={ax:A.x,ay:A.y,bx,by,cx,cy};for(let t=0.08;t<0.93;t+=0.06){const [px,py]=qpt(g,t);for(const [ox,oy] of obs){const d=Math.hypot(px-ox,py-oy);if(d<m)m=d;}}return m;};
   const sg=Math.sign(off0)||1,mag=Math.abs(off0);
-  const cand=[1,1.5,2.1,2.9,3.8].map(k=>sg*mag*k).concat([1,1.5,2.1,2.9,3.8].map(k=>-sg*Math.max(mag,base)*k));
-  let best=null,bc=-1;
-  for(const off of cand){const cx=mx+nx*off,cy=my+ny*off,c=clear(cx,cy);if(c>=24){best=[cx,cy];break;}if(c>bc){bc=c;best=[cx,cy];}}
+  // Bend around cities in the way, but gently: short links need less room, no curve bows out more than about a
+  // third of its length, and when nothing clears, a modest curve beats a giant loop around the neighbourhood.
+  const need=Math.min(24,Math.max(7,len*0.2)),cap=Math.max(mag,len*0.32),lim=o=>Math.sign(o)*Math.min(Math.abs(o),cap);
+  const cand=[1,1.5,2.1,2.9,3.8].map(k=>lim(sg*mag*k)).concat([1,1.5,2.1,2.9,3.8].map(k=>lim(-sg*Math.max(mag,base)*k)));
+  let best=null,bs=-Infinity;
+  for(const off of cand){const cx=mx+nx*off,cy=my+ny*off,c=clear(cx,cy);if(c>=need){best=[cx,cy];break;}const sc=Math.min(c,need)-Math.abs(off)*0.35;if(sc>bs){bs=sc;best=[cx,cy];}}
   const g={ax:A.x,ay:A.y,bx,by,cx:best[0],cy:best[1],len};GEO.set(key,g);return g;}
 const qpt=(g,t)=>[(1-t)*(1-t)*g.ax+2*(1-t)*t*g.cx+t*t*g.bx,(1-t)*(1-t)*g.ay+2*(1-t)*t*g.cy+t*t*g.by];
 const utilCol=u=>u<=0.001?'#AFC0D6':u<0.65?'#22C47A':u<0.9?'#FFAA1F':'#FF4D5E';
