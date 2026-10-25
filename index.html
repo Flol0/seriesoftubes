@@ -14,11 +14,11 @@
 <meta name="apple-mobile-web-app-title" content="Series of Tubes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.23.0">
+<meta name="generator" content="Series of Tubes 1.23.0-pwa.1">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.23.0",
+  "softwareVersion": "1.23.0-pwa.1",
   "dateModified": "2026-10-25",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -551,7 +551,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.23.0"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.23.0-pwa.1"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -569,9 +569,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.23.0';
+const APP_VERSION='1.23.0-pwa.1';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Fixed: on a phone, a first-time player could not get past the \"Play it as an app\" screen in the browser, and the Install button on the title screen did nothing. Settings now also opens from the title screen, as promised in 1.20.0.","Taps land where you meant them (#44): a tap only presses the button it started on, nothing behind a menu that opened or closed mid-tap counts, a toast that pops up under your thumb ignores taps for half a second, and panels no longer redraw under your finger.","The world map draws much lighter (#43). The detailed coastline is now painted once into an image and reused, also when zoomed in, instead of being redrawn every frame. This should fix the garbled map on Firefox for Android, and makes zooming smoother on every phone.","Cairo now reaches the Middle East overland across the Sinai, like Istanbul does across the Bosporus (#47), at the same intercontinental price.","The Tier 1 label shows what you are now (#46): buy transit again or lose a Tier 1 PNI and it drops, with a message saying why. Your Tier 1 badge stays.","When an update adds new networks, you get a free 60-day courtesy route to the ones you cannot reach yet (#46), so your reach no longer drops overnight. Saves from before this version get it too.","Unplugged optics go on a spares shelf instead of in the bin (#45): the next channel of that type uses a spare for free, or you can sell spares on eBuy for 40% of their price."];
+const RELEASE_NOTES=["Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
@@ -3401,12 +3401,14 @@ const cam={x:1050,y:330,z:0.8};
 let CW=0,CH=0,DPR=1;
 /* Installed on an iPhone home screen with a translucent status bar, iOS can report a viewport one status bar
    shorter than the screen while drawing from the very top, leaving an empty strip under the tab bar.
-   Measure the screen instead, on standalone iPhones only. It must not depend on the gap it fixes: once
+   Measure the screen instead, on standalone iPhones using black-translucent only.
+   The default status bar already reserves that space; stretching it would push the tab bar off screen. It must not depend on the gap it fixes: once
    the page is sized to the screen, iOS reports a full viewport, and switching back would bring the strip back. */
 function fixStandaloneHeight(){const R0=document.documentElement;
   const sa=window.navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
   const sh=screen&&screen.width&&screen.height?(innerWidth>innerHeight?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height)):0,gap=sh-innerHeight;
-  const on=sa&&/iPhone|iPod/.test(navigator.userAgent)&&sh>0&&gap>=0&&gap<=80;
+  const translucent=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content==='black-translucent';
+  const on=sa&&translucent&&/iPhone|iPod/.test(navigator.userAgent)&&sh>0&&gap>=0&&gap<=80;
   R0.classList.toggle('iosfix',on);if(on)R0.style.setProperty('--app-h',sh+'px');else R0.style.removeProperty('--app-h');return on?sh:0;}
 function resize(){const ah=fixStandaloneHeight();DPR=Math.min(2,window.devicePixelRatio||1);CW=innerWidth;CH=ah||innerHeight;cv.width=CW*DPR;cv.height=CH*DPR;}
 addEventListener('resize',()=>{resize();WL.key=null;renderLeft();fitHud();});resize();
