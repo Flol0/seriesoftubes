@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.25.2-qol.1] — 2026-10-25
+
+- Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
+
 ## [1.25.2] — 2026-10-25
 
 - Your own IX now supports extra router uplinks and the A/B/Both site controls. Uplinks use router ports, share the fabric capacity and keep working through a single-site outage when split across both sites (#36).

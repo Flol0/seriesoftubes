@@ -628,3 +628,23 @@ test('#36 own IX uplinks use ports, split across sites and stay within fabric ca
  ev("S.cash=1e8;S.ixn.mex=LAG_MAX;window.before=S.cash;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex'),ev('LAG_MAX'));assert.equal(ev('S.cash'),ev('before'));
  assert.deepEqual(errors,[]);
 });
+
+test('Networks filters use available exits even without demand and expose courtesy-only and hidden small networks',()=>{
+ const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.speed=0;S.transit=[];S.ixp={};S.pni=[];S.caches=[];S.grace=null;compute()");
+ assert.equal(ev("netReach('nfx')"),'none');assert.equal(ev("R.demTo.nfx||0"),0);
+ ev("S.transit=[{id:'t',net:'cog',city:'fra',tier:1,down:0}];compute()");assert.equal(ev("netReach('nfx')"),'transit');
+ ev("S.pni=[{id:'p',net:'nfx',city:'fra',tier:1}];compute()");assert.equal(ev("netReach('nfx')"),'direct','a live but idle PNI counts');
+ ev("S.pni=[];S.ixp.fra=1;S.rs.fra=true;compute();window.member=[...ixSessions('fra')][0]");assert.equal(ev('netReach(member)'),'direct');
+ ev("S.ev.ixdown={fra:S.day+10};compute()");assert.equal(ev('netReach(member)'),'transit','a failed exchange is excluded');
+ ev("S.ixp={};S.ev={};S.caches=[{id:'cache',net:'nfx',city:'fra'}];compute()");assert.equal(ev("netReach('nfx')"),'transit','cache hits do not imply full network reach');
+ ev("S.transit[0].down=S.day+10;compute()");assert.equal(ev("netReach('nfx')"),'none');
+ ev("S.caches=[];S.transit=[];S.grace={until:S.day+60,nets:['nfx']};compute()");assert.equal(ev("netReach('nfx')"),'grace');assert.equal(ev('R.reachable.nfx'),true);
+ ev("S.ev.rpki={until:S.day+10,nets:['nfx']};compute()");assert.equal(ev("netReach('nfx')"),'none','filtered exits respect routing incidents');
+ ev("S.ev={};S.grace.nets.push(NETS.find(n=>n.tail).id);compute();UI.left='nets';UI.tailOpen=false;window.innerWidth=360;ACT.netFilter({v:'missing'})");
+ assert.match(dom.window.document.getElementById('leftBody').textContent,/Courtesy route only/);
+ assert.ok(dom.window.document.getElementById('leftBody').textContent.includes(ev('NETS.find(n=>n.tail).name')),'filtered results include otherwise collapsed networks');
+ ev("ACT.netFilter({v:'transit'})");assert.match(dom.window.document.getElementById('leftBody').textContent,/No networks match this filter/);
+ ev("ACT.netFilter({v:'invalid'})");assert.equal(ev('UI.netFilter'),'transit');
+ ev("ACT.netFilter({v:'all'})");assert.equal(ev('UI.tailOpen'),false,'filtering does not change the all-networks collapse preference');
+ assert.deepEqual(errors,[]);
+});
