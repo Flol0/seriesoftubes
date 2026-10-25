@@ -233,7 +233,7 @@ test('#17 #30 very long dark fiber runs in long-haul mode, and regen sites bring
   ev("ACT.buildPop({city:'mos'});S.links.push({id:'lf',a:'lis',b:'mos',kind:'df',km:4551,sys:'roadm',ch:[],ready:0,mo:1000,day:0,cut:0});ACT.buildPop({city:'lis'});S.pops.lis.rgen=3;S.pops.mos.rgen=3;compute()");
   assert.equal(ev("chWhy(S.links.find(l=>l.id==='lf'),'tp16')"), '', 'the transponder fits now');
   ev("ACT.addCh({id:'lf',o:'tp16'});compute()");
-  assert.equal(ev("dfCap(S.links.find(l=>l.id==='lf'))"), 800, 'long-haul mode: 800G per channel');
+  assert.equal(ev("dfCap(S.links.find(l=>l.id==='lf'))"), 1200, 'long-haul mode: 1.2T per channel');
   ev("ACT.regen({id:'lf',d:1});compute()");
   const l = "S.links.find(l=>l.id==='lf')";
   assert.equal(ev(`${l}.regen`), 1);
@@ -561,6 +561,121 @@ test('#12 PNI discovery lists physical presence, marks own POPs and opens the ci
  ev(`S.pni.push({id:'existing',net:'${id}',city:'fra',tier:0});ACT.pniFind({net:'${id}'})`);
  assert.match(dom.window.document.getElementById('modalCard').textContent,/PNI already installed/);
  ev(`NET['${id}'].pops=[];ACT.pniFind({net:'${id}'})`);assert.match(dom.window.document.getElementById('modalCard').textContent,/No PNI locations listed/);
+});
+
+test('#64 your own subsea cable runs beside the route, however many waves share it', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("ACT.buildPop({city:'lon'});ACT.buildPop({city:'dub'});S.links.push({id:'own',a:'lon',b:'dub',kind:'df',own:true,sub:true,km:475,sys:'roadm',ch:[],ready:0,mo:1,day:0,cut:0});GEO.clear()");
+  const span = "(()=>{const g=linkGeom(S.links.find(l=>l.id==='own')),A=CITY.lon,B=CITY.dub;return Math.max(...g.pts.map(p=>segDist(p[0],p[1],[A.x,A.y],[B.x,B.y])));})()";
+  const alone = ev(span);
+  ev("for(let i=0;i<8;i++)S.links.unshift({id:'w'+i,a:'lon',b:'dub',kind:'wave',tier:2,km:475,sub:true,cable:'celtix',mo:1,mult:1,trench:'cab:celtix',cut:0,day:0});GEO.clear()");
+  const crowded = ev(span);
+  assert.ok(Math.abs(crowded - alone) < 0.01, 'the shape does not grow with the waves');
+  assert.ok(crowded < 8, `stays close to the route (${crowded.toFixed(1)})`);
+  const g = ev("linkGeom(S.links.find(l=>l.id==='own')).pts");
+  assert.ok(Math.hypot(g[0][0] - ev('CITY.lon.x'), g[0][1] - ev('CITY.lon.y')) < 1, 'still starts in London');
+  assert.deepEqual(errors, []);
+});
+
+test('#64 leased and own land fiber stay near their route next to a trench full of waves', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("ACT.buildPop({city:'par'});S.links=[];for(let i=0;i<8;i++)S.links.push({id:'w'+i,a:'fra',b:'par',kind:'wave',tier:2,km:478,sub:false,trench:'t1',cut:0,day:0});S.links.push({id:'d1',a:'fra',b:'par',kind:'df',own:false,km:478,sys:'lite',ch:[],ready:0,cut:0,day:0},{id:'d2',a:'fra',b:'par',kind:'df',own:true,km:478,sys:'lite',ch:[],ready:0,cut:0,day:0});GEO.clear()");
+  const r = id => ev(`(()=>{const g=linkGeom(S.links.find(l=>l.id==='${id}')),A=CITY.fra,B=CITY.par,L=Math.hypot(B.x-A.x,B.y-A.y);return Math.max(...g.pts.map(p=>segDist(p[0],p[1],[A.x,A.y],[B.x,B.y])))/L;})()`);
+  assert.equal(ev("['w0','d1','d2'].map(id=>lineIdx(S.links.find(l=>l.id===id))).join()"), '0,1,2', 'eight waves in one trench are one line');
+  for (const id of ['d1', 'd2']) assert.ok(r(id) < 0.35, `${id} bulges ${r(id).toFixed(2)}× the route`);
+  assert.deepEqual(errors, []);
+});
+
+test('buttons behind an open modal stay quiet, and a declined PNI clears its stale button', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e7;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'mrs'});ACT.buyTransit({city:'mrs',net:'cog',tier:1});compute()");
+  // the PNI button was drawn while Tangerine still wanted our traffic; by the click it doesn't
+  ev("R.demTo.tng=50;UI.sel={type:'city',id:'mrs'};UI.tab='peer';renderAll();R.demTo.tng=0;window.__n=0;const o=toast;toast=function(h){if(/declined/.test(h))window.__n++;return o.apply(this,arguments);}");
+  const btn = "document.querySelector('#panel [data-act=pni][data-args*=tng]')";
+  assert.ok(ev(`!!${btn}`), 'a stale button to start with');
+  ev(`${btn}.focus();${btn}.click()`);
+  assert.equal(ev('__n'), 1);
+  assert.equal(ev(`!!${btn}`), false, 'the panel redraws and shows why instead');
+  // with a modal open, a click (from Enter, Space or anything else) on something behind it does nothing
+  ev("R.demTo.tng=50;renderAll();R.demTo.tng=0;const b=" + btn + ";b.focus();ACT.buyIx({city:ixIdsIn('mrs')[0],tier:1})");
+  assert.equal(ev("$('modal').hidden"), false, 'the DE-KICKS quote is open');
+  assert.notEqual(ev("document.activeElement&&document.activeElement.dataset.act"), 'pni', 'focus left the hidden button');
+  ev(`for(let i=0;i<5;i++)document.querySelector('#panel [data-act=pni][data-args*=tng]').click()`);
+  assert.equal(ev('__n'), 1, 'no declines from behind the quote');
+  ev("document.querySelector('#modal [data-act=dkWalk]').click()");
+  assert.equal(ev("$('modal').hidden"), true, 'buttons inside the modal still work');
+  assert.deepEqual(errors, []);
+});
+
+test('#66 #68 subsea optics: engineered glass reaches further, and the same limit caps leased waves', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  // your own Paris–Ashburn cable: 1.2T per channel instead of 400G
+  ev("ACT.buildPop({city:'par'});ACT.buildPop({city:'ash'});S.pops.par.rgen=S.pops.ash.rgen=3;S.links.push({id:'oc',a:'par',b:'ash',kind:'df',own:true,sub:true,km:ownCabKm('par','ash'),sys:'roadm',ch:['tp16'],ready:0,mo:1,day:0,cut:0});compute()");
+  assert.equal(ev("dfCap(S.links.find(l=>l.id==='oc'))"), 1200, `${ev("ownCabKm('par','ash')")} km of your own cable`);
+  // counted as land glass it would be 400G, which is what #66 saw
+  ev("S.links.find(l=>l.id==='oc').sub=false;compute()");
+  assert.equal(ev("dfCap(S.links.find(l=>l.id==='oc'))"), 400);
+  // leased waves: transatlantic London–New York still takes 6.4T (4×1.6T); Paris–Ashburn tops out at 800G
+  assert.equal(ev("subWaveWhy(5,cablesFor('lon','nyc')[0].km,true)"), '');
+  assert.match(ev("subWaveWhy(4,cablesFor('par','ash')[0].km,true)"), /at most 1.2T per carrier/);
+  assert.equal(ev("LT[subMaxTier(cablesFor('par','ash')[0].km)].n"), '800G');
+  assert.equal(ev("LT[subMaxTier(14000)].n"), '400G', 'the longest cables carry 400G waves');
+  assert.equal(ev("subWaveWhy(5,4000,false)"), '', 'land waves are not capped this way');
+  // buying a too-big wave is refused; an old one keeps running
+  ev("UI.pending={a:'par',b:'ash'};UI.via=cablesFor('par','ash')[0].cid;const n=S.links.length;ACT.buildLink({tier:4});window.__d=S.links.length-n");
+  assert.equal(ev('__d'), 0, 'no 1.6T wave across 6,670 km');
+  ev("ACT.buildLink({tier:3})");
+  const w = "S.links.find(l=>l.kind==='wave'&&l.a==='par')";
+  assert.equal(ev(`${w}.tier`), 3, '800G is fine');
+  ev(`ACT.upLink({id:${w}.id,tier:4})`);
+  assert.equal(ev(`${w}.tier`), 3, 'and it cannot be upgraded past the cable');
+  ev(`${w}.tier=5;compute()`);
+  assert.equal(ev(`capOf(${w})`), 6400, 'a wave from an old save keeps its capacity');
+  assert.deepEqual(errors, []);
+});
+
+test('#67 a subsea cable can be laid between landing stations that also share a landmass', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=5e9;S.lvl=4;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  for (const [a, b] of [['mrs', 'sin'], ['cai', 'pmo']]) {
+    assert.equal(ev(`isSub('${a}','${b}')`), false, `${a}–${b} counts as a land route`);
+    assert.equal(ev(`ownCabWhy('${a}','${b}')`), '', `but a cable can be laid ${a}–${b}`);
+  }
+  assert.match(ev("ownCabWhy('fra','ber')"), /on land/, 'inland cities still cannot');
+  ev("ACT.buildPop({city:'mrs'});UI.lmode='df';UI.dfSrc='lease';openLinkModal('mrs','sin')");
+  assert.ok(ev("!!document.querySelector('#modalCard [data-act=ownCab]')"), 'the dark fiber window offers the cable');
+  ev("ACT.ownCab()");
+  assert.match(ev("document.getElementById('modalCard').textContent"), /km of seabed/);
+  ev("ACT.orderCable()");
+  assert.ok(ev("S.links.some(l=>l.own&&l.sub&&l.a==='mrs'&&l.b==='sin')"), 'Marseille–Singapore cable ordered');
+  assert.deepEqual(errors, []);
+});
+
+test('#49 subsea cables stay on the map when you zoom in', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});UI.sel=null;cam.x=CITY.ams.x;cam.y=CITY.ams.y");
+  const strokes = z => ev(`(()=>{cam.z=${z};WL.zAt=0;WL.key=null;const wl=worldLayer(${z});let n=0;const s=ctx.stroke;ctx.stroke=function(){n++;return s.apply(this,arguments);};drawCables([0]);ctx.stroke=s;return [!!wl,!!WL.cab,n];})()`);
+  const far = strokes(1.2), near = strokes(4);
+  assert.equal(far[1], true, 'zoomed out, the cables are painted into the world layer');
+  assert.equal(near[0], true, 'zoomed in, a world layer is still used');
+  assert.equal(near[1], false, 'but without cables in it');
+  assert.ok(near[2] > 20, `so they are drawn live (${near[2]} strokes)`);
+  assert.deepEqual(errors, []);
+});
+
+test('#20 local PNIs satisfy local breakout only while Tier 1, without changing transit or IX rules',()=>{
+ const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.transit=[];S.ixp={};S.pni=[{id:'local',net:'nfx',city:'fra',tier:0}];R.reach=1");
+ assert.equal(ev("REQS.local.ok({city:'fra'})"),false);
+ ev("for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:n.pops.find(c=>c!=='fra'),tier:0});R.reach=1");
+ assert.equal(ev('isTier1()'),true);assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
+ assert.equal(ev("REQS.local.ok({city:'den'})"),false,'a PNI in another city does not count');
+ ev("S.won=true;S.pni=S.pni.filter(p=>p.net!==t1Need()[0].id)");
+ assert.equal(ev("REQS.local.ok({city:'fra'})"),false,'a historical Tier 1 win is insufficient');
+ ev("S.transit=[{id:'t',net:'cog',city:'fra',tier:0}]");assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
+ ev("S.transit=[];S.ixp.fra=0");assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
  assert.deepEqual(errors,[]);
 });
 
@@ -647,4 +762,238 @@ test('Networks filters use available exits even without demand and expose courte
  ev("ACT.netFilter({v:'invalid'})");assert.equal(ev('UI.netFilter'),'transit');
  ev("ACT.netFilter({v:'all'})");assert.equal(ev('UI.tailOpen'),false,'filtering does not change the all-networks collapse preference');
  assert.deepEqual(errors,[]);
+});
+
+test('NOC leased lines tab prices leased dark fiber, own fiber and cables against the leases', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("S.cash=1e9;S.lvl=3;for(const c of ['ams','lon','nyc','par'])ACT.buildPop({city:c});for(const c in S.pops)S.pops[c].rgen=2;const L=(a,b,t)=>{UI.via=null;openLinkModal(a,b);ACT.buildLink({tier:t});closeModal();};L('fra','ams',2);L('fra','ams',2);L('lon','nyc',1);L('fra','par',1);compute()");
+  ev("ACT.dash();ACT.dashTab({k:'lease'})");
+  let t = ev("document.getElementById('dashCard').textContent");
+  assert.match(t, /Leased lines/);
+  assert.match(t, /Amsterdam ⇄ Frankfurt/);
+  assert.match(t, /Lease dark fiber: .* up front/);
+  assert.match(t, /Your own fiber: .* up front/);
+  assert.match(t, /Go transit-free first/, 'own subsea cables stay Tier 1 only');
+  const land = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.a==='ams'))"));
+  assert.equal(land.ls.length, 2, 'parallel waves on one route are grouped');
+  assert.equal(land.cap, 800);
+  const iru = land.opts.find(o => o.k === 'iru'), own = land.opts.find(o => o.k === 'own');
+  assert.equal(iru.days, 30);
+  assert.equal(iru.save, land.mo - iru.omo);
+  assert.ok(iru.save > 0 && iru.pay > 0, 'two 400G waves are worth moving onto dark fiber');
+  assert.ok(iru.up < own.up, 'leased glass costs less up front than digging');
+  assert.ok(own.up > ev("dfBuildCost(kmBetween('ams','fra'))"), 'optics and line system are in the estimate');
+  assert.equal(land.best, Math.max(iru.save, own.save));
+  ev("S.won=true");
+  assert.match(ev("leaseSwaps().find(x=>x.sub).why"), /No optic you can buy reaches/, "Tier 1 alone is not enough without long-haul optics");
+  ev("S.lvl=4;renderDash()");
+  const sub = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.sub))"));
+  assert.equal(sub.why, '');
+  assert.ok(sub.opts.find(o => o.k === 'cab').up > ev("ownCabCost(ownCabKm('lon','nyc'))"));
+  ev("for(const c of ['mrs','sin'])ACT.buildPop({city:c});for(const c in S.pops)S.pops[c].rgen=2;UI.via=null;openLinkModal('mrs','sin');ACT.buildLink({tier:2});closeModal();compute()");
+  const ms = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.a==='mrs'&&x.b==='sin'))"));
+  assert.ok(ms && ms.opts.some(o => o.k === 'cab'), 'landing stations on one landmass can swap a wave for your own cable (#67)');
+  ev("ACT.leaseSwap({a:'ams',b:'fra',src:'lease'})");
+  assert.equal(ev("document.getElementById('dash').hidden"), true);
+  assert.match(ev("document.getElementById('modal').textContent"), /Sign the IRU/);
+  ev("closeModal();ACT.leaseSwap({a:'ams',b:'fra',src:'build'})");
+  assert.match(ev("document.getElementById('modal').textContent"), /Start construction/);
+  ev("closeModal();S.links.push({id:'iru1',a:'fra',b:'par',kind:'df',km:480,sys:'roadm',ch:[],ready:0,mo:900,day:0,cut:0});S.links.push({id:'own1',a:'fra',b:'ams',kind:'df',own:true,km:400,sys:'roadm',ch:[],ready:0,mo:60,day:0,cut:0});ACT.dash();ACT.dashTab({k:'lease'})");
+  t = ev("document.getElementById('dashCard').textContent");
+  assert.match(t, /You already own fiber here/);
+  assert.match(t, /You already lease dark fiber here/);
+  const par = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.b==='par'))"));
+  assert.ok(!par.opts.some(o => o.k === 'iru'), 'no second IRU offered next to the one you lease');
+  assert.ok(!ev("leaseSwaps().some(x=>x.ls.some(l=>l.own))"), 'your own fiber is never listed as a lease');
+  assert.deepEqual(errors, []);
+});
+
+test('connections in the NOC dashboard can be cancelled right there, after a confirm', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("ACT.buildPop({city:'ams'});ACT.buyTransit({city:'fra',net:'cog',tier:1});ACT.buyIx({city:'ams',tier:1});S.pni.push({id:'pn1',city:'fra',net:'nfx',tier:1});S.caches.push({id:'cc1',city:'fra',net:'ggl'},{id:'cc2',city:'fra',net:'ggl'});S.nni.push({city:'fra',prov:'mgp',tier:0});compute();ACT.connOpen()");
+  const card = () => ev("document.getElementById('dashCard').textContent");
+  const click = (k, id) => ev(`ACT.connCancel(${JSON.stringify({ k, id })})`);
+  assert.equal(ev("conns().length"), 5);
+  const tid = ev("S.transit[0].id");
+  click('t', tid);
+  assert.match(card(), /Really cancel\?/, 'first tap only asks');
+  assert.equal(ev("S.transit.length"), 1);
+  click('t', tid);
+  assert.equal(ev("S.transit.length"), 0);
+  assert.doesNotMatch(card(), /Really cancel\?/, 'the list refreshes in place');
+  click('p', 'pn1'); click('p', 'pn1');
+  assert.equal(ev("S.pni.length"), 0);
+  click('ix', 'ams');
+  assert.match(card(), /Really leave\?/);
+  click('ix', 'ams');
+  assert.equal(ev("S.ixp.ams"), undefined);
+  click('c', 'cc1'); click('c', 'cc1');
+  assert.equal(ev("S.caches.length"), 1, 'caches go one box at a time');
+  click('nni', 'fra|mgp'); click('nni', 'fra|mgp');
+  assert.equal(ev("S.nni.length"), 0);
+  ev("S.myIx.fra={name:'Test-IX',members:[],next:S.day+4};S.ixp.fra=2;compute();renderDash()");
+  click('ix', 'fra'); click('ix', 'fra');
+  assert.equal(ev("S.ixp.fra"), 2, 'your own exchange cannot be cancelled from the list');
+  assert.equal(ev("document.getElementById('dash').hidden"), false);
+  assert.deepEqual(errors, []);
+});
+
+test('connections in the NOC dashboard can be upgraded and grown into LAGs right there', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("ACT.buildPop({city:'ams'});for(const c in S.pops)S.pops[c].rgen=2;ACT.buyTransit({city:'fra',net:'cog',tier:1});ACT.buyIx({city:'ams',tier:1});S.pni.push({id:'pn1',city:'fra',net:'nfx',tier:1});S.nni.push({city:'fra',prov:'mgp',tier:0});compute();ACT.connOpen()");
+  const tap = act => ev(`(()=>{const b=document.querySelector('#dashCard [data-act="${act}"]');if(!b||b.disabled)return false;b.click();return true;})()`);
+  assert.ok(tap('lagT'), 'transit row offers a LAG member');
+  assert.equal(ev("S.transit[0].n"), 2);
+  assert.match(ev("document.getElementById('dashCard').textContent"), /Upgrade all to 400G/, 'the list refreshes with the LAG');
+  assert.ok(tap('buyTransit'));
+  assert.equal(ev("S.transit[0].tier"), 2);
+  assert.ok(tap('lagP'));
+  assert.equal(ev("S.pni[0].n"), 2);
+  assert.ok(tap('lagIx'));
+  assert.equal(ev("S.ixn.ams"), 2);
+  assert.ok(tap('buyIx'));
+  assert.equal(ev("S.ixp.ams"), 2);
+  assert.ok(tap('buyNni'));
+  assert.equal(ev("S.nni[0].tier"), 1);
+  assert.equal(ev("document.querySelector('#dashCard [data-act=\"buyNni\"]')"), null, 'no upgrade past the biggest fabric port');
+  assert.equal(ev("document.getElementById('dash').hidden"), false);
+  assert.deepEqual(errors, []);
+});
+
+test('leased-line savings only count when your own glass has room, and include the optics', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'ams'});S.pops.fra.rgen=S.pops.ams.rgen=3");
+  // a 400G leased wave next to your own, almost full Rainbow fiber
+  ev("S.links.push({id:'w',a:'fra',b:'ams',kind:'wave',tier:2,km:450,mo:3000,mult:1,trench:'t',cut:0,day:0},{id:'own',a:'fra',b:'ams',kind:'df',own:true,km:450,sys:'lite',ch:Array(16).fill('zr4'),ready:0,mo:100,day:0,cut:0});compute()");
+  let x = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.a==='ams'||x.b==='ams'))"));
+  assert.equal(x.best, undefined, 'a full fiber saves nothing');
+  assert.equal(x.fit.fits, false);
+  ev("UI.dtab='lease';$('dash').hidden=false;renderDash()");
+  assert.match(ev("$('dash').textContent"), /room for 0 more channels/);
+  // with room on the fiber: savings, and the optics are priced
+  ev("S.links.find(l=>l.id==='own').ch=Array(10).fill('zr4');compute()");
+  x = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.a==='ams'||x.b==='ams'))"));
+  assert.equal(x.best, 3000);
+  assert.equal(x.fit.n, 1);
+  assert.equal(x.fit.up, ev("chCost(S.links.find(l=>l.id==='own'),'zr8')"), 'the cheapest optic per gigabit both routers take');
+  ev("S.pops.ams.rgen=1;compute()");
+  assert.equal(ev("litOn(S.links.find(l=>l.id==='own'),400).up"), ev("chCost(S.links.find(l=>l.id==='own'),'zr4')"), 'an Edge Lord at one end only takes 400ZR+');
+  ev("S.pops.ams.rgen=3;compute()");
+  // the same for waves next to a leased IRU
+  ev("S.links=S.links.filter(l=>l.id!=='own');S.links.push({id:'iru',a:'fra',b:'ams',kind:'df',own:false,km:450,sys:'lite',ch:Array(16).fill('zr4'),ready:0,mo:900,day:0,cut:0});compute()");
+  x = JSON.parse(ev("JSON.stringify(leaseSwaps().find(x=>x.a==='ams'||x.b==='ams'))"));
+  assert.equal(x.lit, undefined, 'a full IRU cannot take the waves');
+  assert.deepEqual(errors, []);
+});
+
+test('cancelling from the Connections list confirms once, without forging the panel state', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buyTransit({city:'fra',net:'cog',tier:1});compute()");
+  const id = ev("S.transit[0].id");
+  ev(`ACT.connCancel({k:'t',id:'${id}'})`);
+  assert.equal(ev('S.transit.length'), 1, 'first tap asks');
+  ev(`ACT.connCancel({k:'t',id:'${id}'})`);
+  assert.equal(ev('S.transit.length'), 0, 'second tap cancels');
+  assert.equal(ev('UI.confirm'), null);
+  ev(`ACT.buyTransit({city:'fra',net:'cog',tier:1})`);
+  ev(`ACT.cancelTransit({id:S.transit[0].id})`);
+  assert.equal(ev('S.transit.length'), 1, 'the POP panel still asks first');
+  assert.deepEqual(errors, []);
+});
+
+test('diversity offers respect buildable cable routes, not current infrastructure', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  assert.equal(ev("diversityPossible('cbo','den')"), false, 'both Colombo exits share SEE-ME-WAVE 4');
+  assert.equal(ev("diversityPossible('den','cbo')"), false, 'same in reverse');
+  assert.equal(ev("diversityPossible('fra','den')"), true, 'expansion is allowed before links are built');
+  ev("S.ev.landban={city:'cbo',until:S.day+100}");
+  ev('S.won=true');
+  assert.equal(ev("diversityPossible('cbo','den')"), true, 'Tier 1 can build an independent subsea cable');
+  ev("S.scn={rules:{banCities:['cbo']}}");
+  assert.equal(ev("diversityPossible('cbo','den')"), false, 'scenario city bans are respected');
+  ev('S.scn=null;S.won=false');
+  assert.equal(ev("diversityPossible('cbo','den')"), false, 'cache follows the cable unlock');
+  assert.deepEqual(errors, []);
+  dom.window.close();
+});
+
+test('mandatory and optional diversity requirements skip impossible city pairs', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  ev("S.lvl=4;S.pops={cbo:{rgen:3,routers:2},den:{rgen:3,routers:2}};window.__hyper=0;window.__div=0");
+  ev(`for(let i=0;i<3000;i++){
+    S.offers=[];spawnOffer();
+    for(const o of S.offers){
+      if(BIZ_T[o.type].div){window.__hyper++;if(!o.reqs.includes('diverse'))throw Error('missing mandatory requirement');}
+      if(o.reqs.includes('diverse')){window.__div++;if(!diversityPossible(o.city,o.city2))throw Error('impossible diversity offer');}
+    }
+  }`);
+  assert.ok(ev('__hyper') > 0, 'feasible mandatory offers still appear');
+  assert.ok(ev('__div') > 0, 'diversity is not disabled globally');
+  assert.deepEqual(errors, []);
+  dom.window.close();
+});
+
+test('save migration checks diversity using the imported cable unlock', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  ev(`window.__save=JSON.parse(JSON.stringify(S));__save.offers=[
+    {id:'bad',type:'hyper',city:'cbo',city2:'den',name:'x',bw:1600,rate:1,reqs:['diverse','netchill'],exp:40},
+    {id:'good',type:'hyper',city:'fra',city2:'den',name:'y',bw:1600,rate:1,reqs:['diverse'],exp:40}
+  ];__save.biz=[{...__save.offers[0],id:'existing',mood:100,since:0}];S.won=true;__save.won=false`);
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(migrate(JSON.parse(JSON.stringify(__save))).offers.map(o=>o.reqs))')), [['netchill'], ['diverse']]);
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(migrate(JSON.parse(JSON.stringify(__save))).biz[0].reqs)')), ['netchill']);
+  ev('__save.won=true;S.won=false');
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(migrate(__save).offers[0].reqs)')), ['diverse', 'netchill']);
+  assert.deepEqual(errors, []);
+  dom.window.close();
+});
+
+test('NOC link navigation replaces the phone and tablet sheet immediately', () => {
+  for (const [width, height, coarse] of [[390, 844, false], [1024, 768, false], [1300, 450, true]]) {
+    const { ev, dom, errors } = load();
+    base(ev);
+    ev(`innerWidth=${width};innerHeight=${height};window.matchMedia=()=>({matches:${coarse}})`);
+    ev("S.links.push({id:'noc-link',a:'fra',b:'ams',kind:'wave',tier:0,km:400,mo:100,cut:0});R.load['noc-link']=capOf(S.links.find(l=>l.id==='noc-link'))*0.95");
+    for (const action of ['dashLink', 'selLink']) {
+      ev("UI.sel=null;UI.left='noc';UI.leftOpen=true;renderPanel();renderLeft();$('left').classList.add('full');$('panel').classList.add('full');UI.confirm='stale'");
+      assert.equal(ev("$('left').classList.contains('closed')"), false);
+      if (action === 'dashLink') ev("UI.dtab='infra';ACT.dash()");
+      // Use the actual dashboard or congested-link button, rather than invoking its handler.
+      const root = action === 'dashLink' ? '#dashCard' : '#leftBody';
+      ev(`document.querySelector('${root} [data-act=${action}][data-args*=noc-link]').click()`);
+      assert.equal(ev("$('dash').hidden"), true);
+      assert.equal(ev('UI.leftOpen'), false, `${action} dismisses NOC at ${width}px`);
+      assert.equal(ev("$('left').classList.contains('closed')"), true, 'DOM closes before a game tick');
+      assert.equal(ev("$('panel').hidden"), false);
+      assert.equal(ev('UI.sel.id'), 'noc-link');
+      assert.equal(ev('UI.sel.type'), 'link');
+      assert.equal(ev('UI.confirm'), null);
+      assert.equal(ev("$('panel').classList.contains('full')"), false, 'new selection starts at normal height');
+    }
+    ev("ACT.closePanel();UI.leftOpen=true;UI.left='noc';renderLeft();ACT.connOpen();ACT.goConn({city:'fra',k:'t'})");
+    assert.equal(ev("$('dash').hidden"), true);
+    assert.equal(ev("$('left').classList.contains('closed')"), true, 'connection navigation still dismisses NOC');
+    assert.equal(ev('UI.sel.id'), 'fra');
+    assert.equal(ev('UI.tab'), 'up');
+    assert.deepEqual(errors, []);
+    dom.window.close();
+  }
+});
+
+test('opening a link on desktop keeps the NOC sidebar available', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  ev("innerWidth=1440;innerHeight=900;S.links.push({id:'noc-link',a:'fra',b:'ams',kind:'wave',tier:0,km:400,mo:100,cut:0});UI.left='noc';UI.leftOpen=true;renderLeft();ACT.dash();ACT.dashLink({id:'noc-link'})");
+  assert.equal(ev("$('dash').hidden"), true);
+  assert.equal(ev('UI.leftOpen'), true);
+  assert.equal(ev("$('left').classList.contains('closed')"), false);
+  assert.equal(ev("$('panel').hidden"), false);
+  assert.equal(ev('UI.sel.id'), 'noc-link');
+  assert.deepEqual(errors, []);
+  dom.window.close();
 });

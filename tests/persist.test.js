@@ -76,3 +76,19 @@ test('#46 an update that adds networks gives a courtesy route, and Tier 1 is sho
   assert.equal(ev("BADGES.find(b=>b.id==='t1').ok()"), true, 'the badge stays');
   assert.deepEqual(errors, []);
 });
+
+test('in-app release notes stay short and link to the full notes on GitHub', () => {
+  const { ev, errors } = load();
+  const long = ['Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a landing station, pay a lot, wait.',
+    'Short one.', 'A 1.6T wave is now cheaper. More text here.', 'Four.', 'Five.', 'Six.', 'Seven.'];
+  const h = ev(`notesHtml(${JSON.stringify(long)},'9.9.9')`);
+  assert.match(h, /lay their own subsea cable \(#22\)\./);
+  assert.doesNotMatch(h, /Pick two cities/, 'only the first sentence');
+  assert.match(h, /A 1\.6T wave is now cheaper\./, 'decimals do not end a sentence');
+  assert.match(h, /and 2 more changes/);
+  assert.match(h, /releases\/tag\/v9\.9\.9/, 'links to the full notes');
+  const short = ev(`notesHtml(${JSON.stringify(['One fix.', 'Another fix.'])},'9.9.9')`);
+  assert.doesNotMatch(short, /releases\/tag/, 'short notes need no link');
+  assert.equal(ev(`slimNote('${'x'.repeat(300)}')`).length <= 140, true);
+  assert.deepEqual(errors, []);
+});

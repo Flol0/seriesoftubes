@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.27.0-qol.1] — 2026-10-25
+
+- Updated to upstream 1.27.0, including the mobile NOC navigation fix, while retaining the local PNI finder, own-IX uplinks, PWA display fix, link redundancy checks and network reach filters.
+
+- Opening a link from the NOC on mobile now closes the NOC sheet so the link details are visible.
+
+## [1.27.0] — 2026-10-25
+
+- New "Leased lines" tab in the NOC dashboard shows which leased waves, fabric circuits and dark fiber IRUs between your POPs you could replace with cheaper capacity: leased dark fiber, your own fiber or your own subsea cable. Each option lists the up-front cost, the monthly cost, how much you would save and when it pays for itself, with a button to plan the build.
+- You can now upgrade, grow and cancel transit, PNIs, IX ports, cache boxes and fabric ports straight from the Connections tab of the NOC dashboard. Each row offers the next port size and another LAG member at the same prices as the POP panel, and cancelling asks you to confirm first.
+- DKNOG in Copenhagen joins the conference calendar every March.
+- A PNI in the customer’s city now meets their local-breakout requirement while your network is Tier 1 (#20).
+- Customers no longer ask for independent routes where the available cables cannot provide them. Impossible diversity requirements in older saves are removed.
+- A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
+
+## [1.26.1] — 2026-10-25
+
+- Subsea cables no longer disappear when you zoom in on the map (#49).
+
+## [1.26.0] — 2026-10-25
+
+- Customer levels now go up to 13 instead of 4. Every new level asks for more peak traffic, POPs and continents, ending at 50 Tbps and 80 POPs on six continents, and each one unlocks new customers, gear or deals. Reaching level 13 earns a new legendary badge.
+- Seven new router models arrive between levels 5 and 13, including the first 3.2T routers with 3.2T ports and 12.8T waves. The Absolute Unit 3.2T is the main upgrade; whitebox, licensed, deep-buffer, Finnish and budget side-grades sit next to it.
+- Paid-peering giants now give you a free PNI once you are big enough. Doitsche Telekomm gives in at level 6, then Voda-Phony, Tel-Mess, Etis-a-lot, China Moble, Du-opoly and Ooh-redoo.
+- Loans got stranger, and good ones got harder to get. Your credit rating now adds a
+  risk premium to the interest rate, the big banks only lend to strong ratings, and a
+  loan worth more than five months of revenue also takes 2–8% of your revenue until
+  it is repaid.
+- Your own subsea cables now run much faster optics over long distances (#66). Subsea fiber is built for its whole route, so optics reach about half as far again as on land: Paris–Ashburn gets 1.2T per channel instead of 400G, and the 1.6T transponder gains a 1.2T long-haul setting on land too.
+- Leased subsea waves now follow the same physics as your own cables (#68). A wave can only be as fast as its cable's length allows: transatlantic still takes 6.4T, the longest transpacific cables top out at 400G or 800G. Waves you already have keep running.
+- You can lay your own subsea cable between two landing stations that also share a landmass, like Marseille–Singapore or Cairo–Palermo (#67).
+- Declined PNI requests no longer repeat over and over behind an open window such as a DE-KICKS quote. Buttons hidden behind a window can no longer be pressed with the keyboard, and a declined PNI now shows why straight away instead of leaving its button there.
+- New customers at the higher levels: esports world finals, sovereign cloud regions, cloud gaming platforms, metaverse platforms, AGI labs and Mars mission ground stations.
+- Traffic keeps growing as you level up. Levels 5, 8, 10 and 12 each start a new era (4K everywhere, cloud gaming, VR, AI agents) that raises how many eyeballs every city wants.
+- New optical gear for big networks: ROADMaster 9000 C+L line systems with 128 channels, Sienna WaveMagic 3.2T transponders, and eight fiber pairs in your own land trenches. Your own exchange gets a 102.4T fabric and scrubbing goes up to 100T.
+- The "Next level" hint keeps names like Edge Lord 400 readable instead of lower-casing them.
+- Your own subsea cable now runs beside the existing cable on its route instead of looping far out to sea (#64). Leased and own fiber next to a busy trench no longer swing out in giant loops either, on any route.
+- New lenders: Ballooney Brothers (nothing to pay until it all comes due at once),
+  Stormy Weather Lending (every open incident adds 2% to your rate), Peer Pressure
+  Partners (you repay with 30% of your transit bill), Horoscope Holdings (the stars set
+  your rate each month) and Papa Pizza Capital (cheap, but every incident means pizza
+  for the NOC).
+- New loan conditions: an odd number of POPs, no building in Bude, no diesel
+  generators, no new links on a Friday, no Goggle caches, a job for the CEO's nephew
+  and a yacht for the chairman.
+- The in-app "What's new" is shorter: the first sentence of each change, at most
+  five, with a link to the full release notes on GitHub.
+
 ## [1.25.2-qol.1] — 2026-10-25
 
 - Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.

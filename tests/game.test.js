@@ -312,3 +312,45 @@ test('#52 loan offers stop once you have half a billion in the bank, and come ba
   assert.ok(seen > 0, 'broke again: the banks are back');
   assert.deepEqual(errors, []);
 });
+
+test('loans: good terms need good credit, big loans want revenue, and the weird lenders do weird things', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e6;ACT.launchBB({city:'fra'});ACT.buyTransit({city:'fra',net:'cog',tier:1});for(let i=0;i<10;i++)dayTick()");
+  // the premium: a weak rating pays more for the same bank
+  assert.ok(ev('RATE_PREM.C') > ev('RATE_PREM.BBB') && ev('RATE_PREM.BBB') > ev('RATE_PREM.AAA'));
+  assert.equal(ev("BANKS.gs.min"), 'AA', 'the best bank only lends to the best');
+  // a big loan comes with a revenue share on top
+  ev("S.loanOffers=[];const k0=Math.random;let n=0;for(let i=0;i<200&&!S.loanOffers.some(o=>o.share&&!BANKS[o.bank].equity);i++){S.loanOffers=[];spawnLoanOffer(false);}");
+  const big = JSON.parse(ev('JSON.stringify(S.loanOffers.find(o=>o.share&&!BANKS[o.bank].equity)||null)'));
+  if (big) assert.ok(big.amount > 5 * Math.max(60000, ev('R.revMo')) && big.share >= 0.02 && big.share <= 0.08);
+  ev("S.loans=[];S.loanOffers=[{id:'b1',bank:'db',amount:2e6,exp:S.day+20,covs:['fax'],apr:0.1,term:12,pay:Math.round(annuity(2e6,0.1,12)),share:0.05}];ACT.takeLoan({id:'b1'})");
+  assert.ok(Math.abs(ev('R.cost.revshare') - ev('R.revMo') * 0.05) < 1, 'pays a share of revenue while the loan runs');
+  // balloon: nothing monthly, everything at the end
+  ev("S.loans=[];S.loanOffers=[{id:'bl',bank:'balloon',amount:100000,exp:S.day+20,covs:[],apr:0.12,term:3,pay:0,model:'balloon'}];ACT.takeLoan({id:'bl'})");
+  assert.equal(ev('R.cost.loans'), 0, 'no monthly payment');
+  const cash0 = ev('S.cash');
+  for (let d = 0; d < 95; d++) ev('dayTick()');
+  assert.equal(ev("S.loans.some(l=>l.id==='bl')"), false, 'the balloon is gone');
+  assert.ok(ev('S.stats.loans') >= 1);
+  // transit-paid loan: 30% of the transit bill
+  ev("S.loans=[];S.loanOffers=[{id:'tp',bank:'ppp',amount:100000,exp:S.day+20,covs:[],term:24,model:'transit',cut:0.3,owe:130000,apr:0,pay:0}];ACT.takeLoan({id:'tp'})");
+  assert.ok(Math.abs(ev('R.cost.loans') - Math.round(ev('R.cost.transit') * 0.3)) <= 1, 'pays with the transit bill');
+  // fees and pizza
+  ev("S.loans=[{id:'f1',bank:'jpm',start:S.day,amount:1,bal:1,apr:0,pay:0,left:12,term:12,share:0,covs:['nephew','pizza'],base:{sub:0}}];compute()");
+  assert.equal(ev('R.cost.loans'), 3000, 'the nephew costs money every month');
+  const c1 = ev('S.cash');
+  ev("addInc({type:'cut',ref:'x',until:S.day+1,msg:'test',cost:0})");
+  assert.equal(c1 - ev('S.cash'), 400, 'pizza after every incident');
+  assert.match(ev("covLabel('yacht')"), /\$8\.0k\/mo/);
+  assert.equal(ev("COVS.oddpops.ok()"), true);
+  ev("ACT.buildPop({city:'ams'})");
+  assert.equal(ev("COVS.oddpops.ok()"), false, 'two POPs break the numerologist');
+  // the bank screen renders every model
+  ev("S.loanOffers=[{id:'o1',bank:'balloon',amount:1e5,exp:S.day+20,covs:['oddpops'],apr:0.1,term:12,pay:0,model:'balloon'},{id:'o2',bank:'ppp',amount:1e5,exp:S.day+20,covs:['nocache'],term:24,model:'transit',cut:0.3,owe:130000},{id:'o3',bank:'astro',amount:1e5,exp:S.day+20,covs:['friday'],apr:0.2,term:12,pay:5000,model:'astro'}];ACT.bank({})");
+  const t = ev("document.getElementById('bankCard').textContent");
+  assert.match(t, /Nothing to pay until the end/);
+  assert.match(t, /of your transit bill/);
+  assert.match(t, /rate set by the stars/);
+  assert.match(t, /numerologist/);
+  assert.deepEqual(errors, []);
+});

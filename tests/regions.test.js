@@ -170,7 +170,7 @@ test('#8 ports can be split across both buildings, so one dark site only halves 
 test('routers: wave and port sizes match what the box can actually take', () => {
   const { ev } = load();
   start(ev);
-  assert.equal(ev("LT.map(t=>t.n).join()"), '10G,100G,400G,800G,1.6T,6.4T');
+  assert.equal(ev("LT.map(t=>t.n).join()"), '10G,100G,400G,800G,1.6T,6.4T,12.8T');
   assert.equal(ev("PORT[RG[3].maxP].n"), '1.6T', 'the 1.6T router has 1.6T ports');
   assert.equal(ev("LT[RG[2].maxLT].n"), '800G', 'an 800G router stops at 800G waves');
   assert.equal(ev("LT[RG[3].maxLT].n"), '6.4T');

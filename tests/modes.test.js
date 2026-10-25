@@ -6,7 +6,8 @@ test('sandbox: endless money, every unlock, nothing breaks, no badges', () => {
   const { ev, errors } = load();
   ev("ACT.modeSet({m:'sandbox'});ACT.start({})");
   assert.equal(ev("S.mode"), 'sandbox');
-  assert.equal(ev("S.lvl"), 4);
+  assert.equal(ev("S.lvl"), ev("LEVELS.length"));
+  assert.equal(ev("LEVELS.length"), 13);
   ev("S.cash=5;for(let i=0;i<120;i++)dayTick()");
   assert.ok(ev("S.cash") >= 1e8, 'money refills');
   assert.equal(ev("S.stats.incidents"), 0, 'no failures');
@@ -262,7 +263,7 @@ test('#34 scenario goal, progress and customer level are always in view', () => 
   assert.match(left(), /Mind the Gap/);
   assert.match(left(), /POP in Bogotá/);
   assert.match(left(), /days left/);
-  assert.match(left(), /Customer level 1 of 4/);
+  assert.match(left(), /Customer level 1 of 13/);
   assert.equal(ev("$('hScn').hidden"), false, 'scenario chip in the top bar');
   const f0 = ev('scnProg().f');
   ev("S.cash=1e8;ACT.buildPop({city:'bog'});ACT.buildPop({city:'lim'});compute();renderAll()");
@@ -344,4 +345,20 @@ test('opaque iOS status bar keeps the HUD below the system area without stretchi
  assert.equal(ev("document.documentElement.style.getPropertyValue('--app-h')"),'');
  set(w,'innerWidth',844);set(w,'innerHeight',370);ev('resize()');assert.equal(ev('CH'),370);
  assert.deepEqual(errors,[]);
+});
+
+test('DKNOG in Copenhagen is on the conference calendar', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;for(const g of GOALS)S.done[g.id]=0");
+  const cf = JSON.parse(ev("JSON.stringify(CONFS.find(c=>c.n==='DKNOG'))"));
+  assert.equal(cf.c, 'cph');
+  assert.equal(ev(`MONTHS[${cf.m}]`), 'Mar', 'held in March, like the real one');
+  ev(`S.day=confDay(CONFS.find(c=>c.n==='DKNOG'),0)-20;ACT.leftTab({t:'deals'})`);
+  assert.match(ev("document.body.textContent"), /DKNOG/);
+  const key = ev("upcomingConfs(30).find(c=>c.n==='DKNOG').key");
+  ev(`ACT.confGo({key:'${key}'})`);
+  ev("for(let i=0;i<21;i++)dayTick()");
+  assert.equal(ev("S.conf&&S.conf.reg"), 'EU', 'the glow helps with European peers');
+  assert.match(ev("S.log.map(e=>e.t).join(' | ')"), /just one more drink/, 'and the evening went as DKNOG evenings go');
+  assert.deepEqual(errors, []);
 });

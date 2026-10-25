@@ -10,7 +10,7 @@ thousand lines), so find things by the section banners rather than by line numbe
 /* ================= CONSTANTS ================= */   prices, ports (PORT), routers (RG), optics
 /* ================= WORLD ================= */       CITIES, CABLES, display nudges
 /* ================= NETWORKS ================= */    NETS (other ASes), traffic shares (NSH)
-/* ================= BUSINESSES ================= */  BIZ_T customer types, LEVELS
+/* ================= BUSINESSES ================= */  BIZ_T customer types, LEVELS + LV_REQ (13 levels, traffic eras)
 /* ================= GOALS ================= */       GOALS checklist
 /* ================= STATE ================= */       S, R, UI globals
 /* ================= BANKS & LOANS ================= */
