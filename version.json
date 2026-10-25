@@ -1,7 +1,7 @@
 {
-  "version": "1.28.0-qol.1",
+  "version": "1.28.0-qol.2",
   "date": "2026-10-25",
   "notes": [
-    "Updated to upstream 1.28.0 with the new Benelux cities and networks, retaining all local QoL improvements."
+    "Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included."
   ]
 }
