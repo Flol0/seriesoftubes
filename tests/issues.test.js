@@ -515,3 +515,27 @@ test('#45 unplugged optics go on a spares shelf, get reused for free, or sold fo
   assert.deepEqual(JSON.parse(ev('JSON.stringify(S.spares)')), { [o]: 2 });
   assert.deepEqual(errors, []);
 });
+
+test('#12 PNI discovery lists physical presence, marks own POPs and opens the city',()=>{
+ const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.left='nets';renderAll();ACT.pniFind({net:'gog'})");
+ const id=ev("NETS.find(n=>n.pops.length>6&&n.pops.includes('fra')).id");ev(`ACT.pniFind({net:'${id}'})`);
+ let rows=dom.window.document.querySelectorAll('#modalCard [data-act="pniGo"]');
+ assert.equal(rows.length,ev(`new Set(NET['${id}'].pops).size`));
+ assert.equal(JSON.parse(rows[0].dataset.args).city,'fra');
+ assert.match(dom.window.document.getElementById('modalCard').textContent,/Your POP/);
+ assert.ok(dom.window.document.getElementById('modalCard').textContent.includes(ev('CITY.fra.dc')));
+ const city=ev(`NET['${id}'].pops.find(c=>!S.pops[c])`);const cash=ev('S.cash');
+ ev(`ACT.pniGo({net:'${id}',city:'${city}'})`);
+ assert.equal(ev('UI.sel.id'),city);assert.equal(ev('UI.tab'),'peer');assert.equal(ev('S.cash'),cash);assert.equal(ev(`!!S.pops['${city}']`),false);
+ assert.equal(dom.window.document.getElementById('modal').hidden,true);
+ ev('window.innerWidth=360');ev(`ACT.pniFind({net:'${id}'})`);
+ assert.equal(ev("$('modal').className"),'pni-locations');
+ assert.equal(dom.window.document.getElementById('modalCard').getAttribute('aria-modal'),'false');
+ ev("ACT.phoneTab({t:'noc'})");assert.equal(dom.window.document.getElementById('modal').hidden,true);
+ ev(`ACT.pniFind({net:'${id}'})`);
+ assert.equal(dom.window.document.querySelectorAll('#modalCard [data-act="pniGo"]').length,rows.length);
+ ev(`S.pni.push({id:'existing',net:'${id}',city:'fra',tier:0});ACT.pniFind({net:'${id}'})`);
+ assert.match(dom.window.document.getElementById('modalCard').textContent,/PNI already installed/);
+ ev(`NET['${id}'].pops=[];ACT.pniFind({net:'${id}'})`);assert.match(dom.window.document.getElementById('modalCard').textContent,/No PNI locations listed/);
+ assert.deepEqual(errors,[]);
+});

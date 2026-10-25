@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.23.0-pwa.3] — 2026-10-25
+
+- Find PNI locations from the Networks list and NOC traffic table, with your POPs first and city shortcuts. The mobile tab bar remains accessible (#12).
+
 ## [1.23.0-pwa.2] — 2026-10-25
 
 - Installed apps paint a solid top edge from startup, without needing to open the bank first.

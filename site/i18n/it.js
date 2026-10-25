@@ -2193,4 +2193,9 @@
 "Spares shelf":"Scaffale ricambi",
 "Sell one <small>{price}</small>":"Vendine uno <small>{price}</small>",
 "<b>New networks on the map.</b><br>This update added networks you are not connected to yet. For {n} days a free courtesy route reaches them, so your reach does not drop overnight. Peer with them, or buy transit, before it ends.":"<b>Nuove reti sulla mappa.</b><br>Questo aggiornamento ha aggiunto reti a cui non sei ancora collegato. Per {n} giorni un percorso di cortesia gratuito le raggiunge, così la tua raggiungibilità non crolla da un giorno all’altro. Fai peering con loro, o compra transit, prima che finisca.",
+"Find PNI":"Trova PNI",
+"PNI locations":"Sedi per PNI",
+"Physical presence, not a peering promise. Each location still has its own traffic requirements and peering policy.":"Presenza fisica, non una promessa di peering. Ogni sede mantiene i propri requisiti di traffico e la propria policy di peering.",
+"PNI already installed":"PNI già installato",
+"No PNI locations listed.":"Nessuna sede per PNI elencata.",
 };

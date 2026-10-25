@@ -428,6 +428,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
   #coach{top:auto !important;bottom:calc(var(--tabbar) + 8px);width:calc(100% - 16px);padding:7px 10px;font-size:13px}
   body.sheet-open #coach{bottom:calc(var(--tabbar) + 8px + min(62vh,520px))}
   #modal{align-items:end;padding:0}
+  #modal.pni-locations{bottom:var(--tabbar)}
   #modal .cta{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));z-index:1;background:var(--paper);margin:12px -16px 0 !important;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--line)}
   .title-art h1{font-size:34px}.title-art svg{width:54px;height:54px}
   .tagline{font-size:13.5px;margin:8px 0 10px}
@@ -2456,7 +2457,7 @@ const ACT={
  tab:({t})=>{UI.tab=t;UI.confirm=null;renderPanel();},
  leftTab:({t})=>{UI.left=t;UI.leftOpen=true;renderLeft();},
  toggleLeft:()=>{UI.leftOpen=!UI.leftOpen;renderLeft();},
- phoneTab:({t})=>{if(!['goals','deals','noc','nets'].includes(t))return;haptic(8);if(UI.leftOpen&&UI.left===t&&!UI.sel){UI.leftOpen=false;}else{UI.left=t;UI.leftOpen=true;UI.sel=null;renderPanel();}$('left').classList.remove('full');renderLeft();},
+ phoneTab:({t})=>{if(!['goals','deals','noc','nets'].includes(t))return;if($('modal').classList.contains('pni-locations'))closeModal();haptic(8);if(UI.leftOpen&&UI.left===t&&!UI.sel){UI.leftOpen=false;}else{UI.left=t;UI.leftOpen=true;UI.sel=null;renderPanel();}$('left').classList.remove('full');renderLeft();},
  phonePlay:()=>{haptic(10);if(UI.speed){UI.lastSpeed=UI.speed;UI.speed=0;}else UI.speed=UI.lastSpeed||1;renderHUD();},
  phoneSpeed:()=>{haptic(8);const cur=UI.speed||UI.lastSpeed||1,i=SPEEDS.indexOf(cur),n=SPEEDS[(i+1)%SPEEDS.length];UI.speed=n;UI.lastSpeed=n;renderHUD();},
  install:()=>{if(installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;});return;}
@@ -2566,6 +2567,8 @@ const ACT={
  custCity:({v})=>{UI.kf=UI.kf||{};UI.kf.city=isCity(v)?v:'';renderDash();},
  custSort:({k})=>{if(!['mood','mo','name','city'].includes(k))return;if(UI.custSort===k)UI.custDir=-(UI.custDir||1);else{UI.custSort=k;UI.custDir=k==='mo'?-1:1;}renderDash();},
  custOpen:({sad}={})=>{if(!S)return;UI.kf=sad?{f:'sad'}:{};UI.dtab='cust';const d=$('dash');d.hidden=false;renderDash();d.scrollTop=0;},
+ pniFind:({net})=>{if(!NET[net])return;pniModal(net);},
+ pniGo:({net,city})=>{if(!NET[net]||!NET[net].pops.includes(city))return;closeModal();ACT.goConn({city,k:'p'});},
  goConn:({city,k})=>{if(!isCity(city)||!own(CONN_K,k))return;$('dash').hidden=true;ACT.goEgress({city,k});},
  connF:({f,v})=>{const F=UI.cf=UI.cf||{};if(f==='all'){UI.cf={};}else if(f==='k'){F.k=own(CONN_K,v)?v:'';}renderDash();},
  connCity:({v})=>{UI.cf=UI.cf||{};UI.cf.city=isCity(v)?v:'';renderDash();},
@@ -2835,7 +2838,7 @@ function renderLeft(){checkLayer();
     if(conns().length)h+=`<div class="btns" style="margin-bottom:8px">${btn(tr('All connections <small>{n}</small>',{n:conns().length}),'connOpen',{},'pink sm')}</div>`;
     const tl=NETS.filter(n=>n.tail),tlOn=tl.filter(n=>Object.keys(S.ixp).some(c=>ixSessions(c).has(n.id))).length;
     for(const n of NETS){if(n.tail&&!UI.tailOpen)continue;
-      h+=`<div class="row">${logo(n)}<div class="grow"><div class="nm">${esc(n.name)} <span class="meta">AS${n.asn}</span></div><div class="meta"><span class="tag ${n.type}">${TYPE_L[n.type]}</span> <span class="tag ${n.pol}">${n.pol}</span> · ${tr('{p}% of traffic',{p:(NSH[n.id]*100).toFixed(1)})}${n.price?` · ${tr('transit ${price}/Gbps',{price:(n.price*S.priceMul).toFixed(2)})}`:''}</div><div class="meta">${esc(n.blurb)}</div>${netWhere(n)}</div></div>`;}
+      h+=`<div class="row">${logo(n)}<div class="grow"><div class="nm">${esc(n.name)} <span class="meta">AS${n.asn}</span></div><div class="meta"><span class="tag ${n.type}">${TYPE_L[n.type]}</span> <span class="tag ${n.pol}">${n.pol}</span> · ${tr('{p}% of traffic',{p:(NSH[n.id]*100).toFixed(1)})}${n.price?` · ${tr('transit ${price}/Gbps',{price:(n.price*S.priceMul).toFixed(2)})}`:''}</div><div class="meta">${esc(n.blurb)}</div>${netWhere(n)}<div class="btns">${btn(tr('Find PNI'),'pniFind',{net:n.id},'ghost sm')}</div></div></div>`;}
     h+=`<div class="row"><div class="grow"><div class="nm">${tr('The long tail')} <span class="meta">${tr('{n} small networks',{n:tl.length})}</span></div><div class="meta">${tr('{p}% of traffic between them, scattered across exchanges. You peer with {n}.',{p:(tl.reduce((a,n)=>a+NSH[n.id],0)*100).toFixed(1),n:tlOn})}</div></div>${btn(UI.tailOpen?tr('Hide'):tr('Show'),'tailTog',{},'ghost sm')}</div>`;
   }
   if(h!==UI._lh){UI._lh=h;$('leftBody').innerHTML=h;}
@@ -3199,6 +3202,9 @@ function netWhere(n){const ch=[];
   for(const c of new Set(S.caches.filter(x=>x.net===n.id).map(x=>x.city)))ch.push([tr('Cache'),c,'c']);
   if(!ch.length)return '';const MAX=6;
   return `<div class="btns">${ch.slice(0,MAX).map(([l,c,k])=>btn(`${esc(l)} <small>${esc(CITY[c].name)}</small>`,'goConn',{city:c,k},'ghost sm')).join('')}${ch.length>MAX?btn(tr('+{n} more',{n:ch.length-MAX}),'connFor',{net:n.id},'ghost sm'):''}</div>`;}
+// Physical presence is discoverable even before a network will accept peering.
+function pniModal(id){const n=NET[id],cities=[...new Set(n.pops)].filter(isCity).sort((a,b)=>Number(!!S.pops[b])-Number(!!S.pops[a])||CITY[a].name.localeCompare(CITY[b].name));
+  openModal(`<div class="eyebrow">AS${n.asn} · ${esc(n.name)}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h2>${tr('PNI locations')}</h2><button class="x" data-act="closeModal" aria-label="${tr('Close')}">×</button></div><p class="lead">${tr('Physical presence, not a peering promise. Each location still has its own traffic requirements and peering policy.')}</p>${cities.length?cities.map(c=>`<div class="row"><div class="grow"><div class="nm">${esc(CITY[c].name)}${S.pops[c]?' <span class="tag st">'+tr('Your POP')+'</span>':''}</div><div class="meta">${esc(CITY[c].dc)}</div>${S.pni.some(p=>p.net===id&&p.city===c)?'<div class="meta">'+tr('PNI already installed')+'</div>':''}</div>${btn(tr('Open'),'pniGo',{net:id,city:c},'ghost sm')}</div>`).join(''):'<p class="empty">'+tr('No PNI locations listed.')+'</p>'}<div class="btns">${btn(tr('Close'),'closeModal',{},'ghost')}</div>`,'pni-locations');}
 const DTABS=['overview','cust','conn','traffic','infra'];
 function dashTabs(){const u=custStats().unhappy,cur=UI.dtab||'overview',L={overview:tr('Overview'),cust:tr('Customers'),conn:tr('Connections'),traffic:tr('Traffic'),infra:tr('Links & routers')};
   return `<nav class="dtabs">${DTABS.map(k=>`<button class="${cur===k?'on':''}" data-act="dashTab" data-args='{"k":"${k}"}'>${L[k]}${k==='cust'&&u?`<span class="cnt red">${u}</span>`:''}</button>`).join('')}</nav>`;}
@@ -3221,7 +3227,7 @@ function renderDash(){checkLayer();
   if(DT==='cust')h+=custSection();
   if(DT==='conn')h+=connSection();
   if(DT==='traffic')h+=`<div class="panel2" style="margin-top:12px"><h3>${tr('Traffic by network (ASN)')}</h3><p class="note" style="margin-top:0">${tr("Where your users' traffic comes from, and how it gets to you. Transit is the only part you pay per gigabit; caches, PNIs and IX peering are free or flat-rate. Tap a column to sort.")}</p><div class="legend" style="margin:0 0 6px">${['c','p','ix','t'].map(k=>`<span><i style="background:${EGC[k][1]}"></i>${EGC[k][0]}</span>`).join('')}</div><div class="tscroll"><table class="tbl"><thead><tr>${[['name',tr('Network'),''],['asn','AS',''],['type',tr('Type'),''],['traffic',tr('Traffic'),'r'],['mix',tr('How it arrives'),''],['cost',tr('Transit cost'),'r'],['lost',tr('Lost'),'r']].map(([k,l,c])=>`<th class="${c}">${k==='mix'?l:`<button class="thb" data-act="dashSort" data-args="${esc(JSON.stringify({k}))}">${l}${UI.dashSort===k?(UI.dashDir>0?' ▲':' ▼'):''}</button>`}</th>`).join('')}</tr></thead><tbody>
-  ${nets.map(({n,e,t,want})=>{return `<tr><td><span style="display:inline-flex;align-items:center;gap:6px">${logo(n)}<b>${esc(n.name)}</b></span></td><td>${n.asn}</td><td><span class="tag ${n.type}">${TYPE_L[n.type]}</span></td><td class="r">${fmtG(t)}</td><td><div class="mix" title="${['c','p','ix','t'].filter(k=>e[k]>0.01).map(k=>EGC[k][0]+' '+fmtG(e[k])).join(' · ')||tr('nothing yet')}">${['c','p','ix','t'].map(k=>`<i style="width:${t?e[k]/t*100:0}%;background:${EGC[k][1]}"></i>`).join('')}</div></td><td class="r">${e.t>0.01?tr('{price}/mo',{price:fmt$((R.cost.transit||0)*e.t/tT)}):'—'}</td><td class="r" style="color:${want-t>want*0.05?'var(--bad)':'inherit'}">${want>0.01?pct(Math.max(0,1-t/want)):'—'}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+  ${nets.map(({n,e,t,want})=>{return `<tr><td><span style="display:inline-flex;align-items:center;gap:6px">${logo(n)}<b>${esc(n.name)}</b></span>${n.id!=='_tail'?`<div class="btns">${btn(tr('Find PNI'),'pniFind',{net:n.id},'ghost sm')}</div>`:''}</td><td>${n.asn}</td><td><span class="tag ${n.type}">${TYPE_L[n.type]}</span></td><td class="r">${fmtG(t)}</td><td><div class="mix" title="${['c','p','ix','t'].filter(k=>e[k]>0.01).map(k=>EGC[k][0]+' '+fmtG(e[k])).join(' · ')||tr('nothing yet')}">${['c','p','ix','t'].map(k=>`<i style="width:${t?e[k]/t*100:0}%;background:${EGC[k][1]}"></i>`).join('')}</div></td><td class="r">${e.t>0.01?tr('{price}/mo',{price:fmt$((R.cost.transit||0)*e.t/tT)}):'—'}</td><td class="r" style="color:${want-t>want*0.05?'var(--bad)':'inherit'}">${want>0.01?pct(Math.max(0,1-t/want)):'—'}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   if(DT==='traffic'){const top=transitTop(S.transit.map(t=>t.id),8);if(top.length)h+=`<div class="panel2" style="margin-top:12px"><h3>${tr('Who your transit carries')}</h3><p class="note" style="margin-top:0">${tr('The networks you pay transit to reach, biggest first, and the cheapest way to move each one to peering. This is your to-do list on the way to Tier 1.')}</p>${top.map(([id,v])=>`<div class="row">${logo(NET[id])}<div class="grow"><div class="nm">${esc(NET[id].name)} <span class="meta">AS${NET[id].asn} · ${fmtG(v)} · ${tr('about {price}/mo',{price:fmt$((R.cost.transit||0)*v/tT)})}</span></div><div class="meta">${esc(offTransitHint(id))}</div></div></div>`).join('')}</div>`;}
   const ls=S.links.filter(l=>capOf(l)>0).map(l=>({l,u:(R.load[l.id]||0)/capOf(l)})).sort((a,b)=>b.u-a.u).slice(0,8);
   const rs=Object.keys(S.pops).map(c=>({c,u:(R.nodeLoad[c]||0)/(R.nodeCap[c]||1)})).sort((a,b)=>b.u-a.u).slice(0,6);
@@ -3271,7 +3277,7 @@ function toast(html,kind='',actions=[]){
 const markLayer=()=>{UI.layerAt=performance.now();};
 // Which layers are open: when that changes (a sheet, the dashboard, the bank, a selection), taps in flight are void.
 function checkLayer(){const q=id=>{const e=$(id);return e?(e.hidden?0:1):0;},sig=[q('modal'),q('dash'),q('bankBox'),UI.leftOpen?1:0,UI.left||'',UI.sel?UI.sel.type+UI.sel.id:'',UI.tab||''].join('|');if(sig!==UI._layer){UI._layer=sig;markLayer();}}
-function openModal(html){if($('modal').hidden)markLayer();$('modalCard').innerHTML=html;$('modal').hidden=false;}
+function openModal(html,cls=''){$('modal').className=cls;$('modalCard').setAttribute('aria-modal',cls==='pni-locations'&&isPhone()?'false':'true');if($('modal').hidden)markLayer();$('modalCard').innerHTML=html;$('modal').hidden=false;}
 function closeModal(){if(!$('modal').hidden)markLayer();$('modal').hidden=true;UI.pending=null;}
 const NETWORK_NAMES=[
   'Packet Pals','Shinternet','Post, Telegraph & Tubes','Peering Pressure','Best Effort Telecom',
