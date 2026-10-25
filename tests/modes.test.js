@@ -293,3 +293,20 @@ test('NOC dashboard has a tab bar for its sections', () => {
   assert.equal(ev('UI.dtab'), 'infra', 'unknown tabs are ignored');
   assert.deepEqual(errors, []);
 });
+
+test('a brand-new phone player can click through the install pitch and the title screen buttons', () => {
+  const { ev, dom, errors } = load();
+  const w = dom.window, doc = w.document;
+  Object.defineProperty(w, 'innerWidth', { value: 390, configurable: true });
+  ev('showTitle()');
+  assert.equal(ev('S'), null, 'no game yet');
+  const click = (sel) => { const el = doc.querySelector(sel); assert.ok(el, sel); el.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); };
+  click('#modal [data-act="settings"]');
+  assert.match(doc.getElementById('modal').textContent, /Pause when a customer is furious/, 'Settings opens before any game exists');
+  click('#modal [data-act="settingsClose"]');
+  click('#modal [data-act="start"]');
+  assert.match(doc.getElementById('modal').textContent, /Play it as an app/);
+  click('#modal .cta [data-act="pitchSkip"]');
+  assert.equal(ev('!!(S&&UI.started)'), true, 'Play in the browser anyway really starts the game');
+  assert.deepEqual(errors, []);
+});

@@ -327,9 +327,10 @@ test('#40 overland between continents costs ten times subsea or more, and has no
   base(ev);
   const r = JSON.parse(ev(`JSON.stringify(CABLE_PAIRS.filter(c=>landX(c.a,c.b)).map(c=>{
     const land=waveMo(kmBetween(c.a,c.b),false,2)*landMult(c.a,c.b)*waveMarket(c.a,c.b,false).m;
-    const sub=waveMo(c.km,true,2)*CAB[c.cid].price*waveMarket(c.a,c.b,true).m;return land/sub;}))`));
+    const sub=waveMo(c.km,true,2)*CAB[c.cid].price*waveMarket(c.a,c.b,true).m;return [land/sub,!!(CITY[c.a].land2||CITY[c.b].land2)];}))`));
   assert.ok(r.length >= 4, 'Europe–Asia cable routes exist to compare');
-  for (const x of r) assert.ok(x >= 10, `overland is at least 10× subsea (${x.toFixed(1)})`);
+  // Across a land bridge (Cairo, #47) the cable goes the long way round Arabia, so overland is "only" 4–9× dearer.
+  for (const [x, bridge] of r) assert.ok(x >= (bridge ? 4 : 10), `overland is at least ${bridge ? 4 : 10}× subsea (${x.toFixed(1)})`);
   assert.equal(ev("landX('mrs','hkg')"), true);
   assert.equal(ev("landX('fra','mrs')"), false, 'inside Europe stays normal');
   assert.equal(ev("landMult('fra','mrs')"), 1);
@@ -487,5 +488,30 @@ test('#42 the share card draws links across the date line on both edges of the m
     ev("S.links.push({id:'x1',a:'tok',b:'sea',kind:'wave',tier:0,km:7700,mult:1,mo:0},{id:'x2',a:'sea',b:'tok',kind:'wave',tier:0,km:7700,mult:1,mo:0})");
   }
   ev('shareCanvas()');
+  assert.deepEqual(errors, []);
+});
+
+test('#45 unplugged optics go on a spares shelf, get reused for free, or sold for 40%', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("S.lvl=4;ACT.buildPop({city:'ams'});S.pops.fra.rgen=S.pops.ams.rgen=RG.length-1;S.links.push({id:'df1',a:'fra',b:'ams',kind:'df',km:450,sys:'roadm',ch:[],ready:0,mo:500,day:0,cut:0});compute()");
+  const o = ev("Object.keys(OPT).find(k=>!chWhy(S.links[0],k))");
+  const c0 = ev('S.cash');
+  ev(`ACT.addCh({id:'df1',o:'${o}'})`);
+  const price = c0 - ev('S.cash');
+  assert.ok(price > 0);
+  ev(`ACT.rmCh({id:'df1',o:'${o}'})`);
+  assert.equal(ev(`S.spares['${o}']`), 1, 'the optic goes on the shelf');
+  const c1 = ev('S.cash');
+  ev(`ACT.addCh({id:'df1',o:'${o}'})`);
+  assert.equal(ev('S.cash'), c1, 'plugging it back in is free');
+  assert.equal(ev(`S.spares['${o}']`), 0);
+  ev(`ACT.rmCh({id:'df1',o:'${o}'});ACT.sellSpare({o:'${o}'})`);
+  assert.equal(ev('S.cash') - c1, Math.round(price * 0.4), 'sold for 40% of its price');
+  ev(`ACT.sellSpare({o:'${o}'})`);
+  assert.equal(ev('S.cash') - c1, Math.round(price * 0.4), 'nothing to sell twice');
+  // the shelf survives a save and junk is cleaned
+  ev(`S.spares={'${o}':2,nope:5,x:-1};S=migrate(JSON.parse(JSON.stringify(S)))`);
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(S.spares)')), { [o]: 2 });
   assert.deepEqual(errors, []);
 });

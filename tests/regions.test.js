@@ -386,3 +386,16 @@ test('#41 real coastlines: every city is on land, and the far view drops tiny is
   ev('ACT.start({});cam.z=0.5;draw(0);cam.z=2;draw(0)');
   assert.deepEqual(errors, []);
 });
+
+test('#47 Cairo reaches Asia overland across the Sinai, priced like the Bosporus', () => {
+  const { ev, errors } = load();
+  assert.equal(ev("isSub('cai','dxb')"), false, 'Cairo–Dubai can go overland');
+  assert.equal(ev("isSub('ist','dxb')"), false, 'like Istanbul–Dubai');
+  assert.equal(ev("landX('cai','dxb')"), true, 'at the intercontinental price');
+  assert.equal(ev("landMult('cai','dxb')"), ev("landMult('ist','dxb')"));
+  assert.equal(ev("dfAllowed('cai','dxb')"), false, 'no dark fiber across a dozen borders');
+  assert.equal(ev("isSub('cai','nbo')"), false, 'still part of Africa');
+  assert.equal(ev("isSub('lag','dxb')"), true, 'the rest of Africa still needs a cable or a hop via Cairo');
+  assert.equal(ev("isSub('cai','lon')"), true, 'the Channel is still the sea');
+  assert.deepEqual(errors, []);
+});

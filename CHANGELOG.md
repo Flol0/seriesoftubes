@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.23.0] — 2026-10-25
+
+- Fixed: on a phone, a first-time player could not get past the "Play it as an
+  app" screen in the browser, and the Install button on the title screen did
+  nothing. Settings now also opens from the title screen, as promised in 1.20.0.
+- Taps land where you meant them (#44): a tap only presses the button it started
+  on, nothing behind a menu that opened or closed mid-tap counts, a toast that
+  pops up under your thumb ignores taps for half a second, and panels no longer
+  redraw under your finger.
+- The world map draws much lighter (#43). The detailed coastline is now painted
+  once into an image and reused, also when zoomed in, instead of being redrawn
+  every frame. This should fix the garbled map on Firefox for Android, and makes
+  zooming smoother on every phone.
+- Cairo now reaches the Middle East overland across the Sinai, like Istanbul
+  does across the Bosporus (#47), at the same intercontinental price.
+- The Tier 1 label shows what you are now (#46): buy transit again or lose a
+  Tier 1 PNI and it drops, with a message saying why. Your Tier 1 badge stays.
+- When an update adds new networks, you get a free 60-day courtesy route to
+  the ones you cannot reach yet (#46), so your reach no longer drops overnight.
+  Saves from before this version get it too.
+- Unplugged optics go on a spares shelf instead of in the bin (#45): the next
+  channel of that type uses a spare for free, or you can sell spares on eBuy
+  for 40% of their price.
+
 ## [1.22.0] — 2026-10-25
 
 - Scenarios show their goal and your progress at all times (#34): a card at the
