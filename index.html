@@ -18,7 +18,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.25.2">
+<meta name="generator" content="Series of Tubes 1.25.2-qol.1">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.25.2",
+  "softwareVersion": "1.25.2-qol.1",
   "dateModified": "2026-10-25",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -556,7 +556,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.25.2"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.25.2-qol.1"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -574,9 +574,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.25.2';
+const APP_VERSION='1.25.2-qol.1';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Your own IX now supports extra router uplinks and the A/B/Both site controls. Uplinks use router ports, share the fabric capacity and keep working through a single-site outage when split across both sites (#36).","A PNI in the customer’s city now meets their local-breakout requirement while your network is Tier 1 (#20).","Retained the PNI directory, missing-POP deal navigation, installed-app HUD fix and on-demand link redundancy checks.","Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a cable landing station, pay a frankly rude amount of money, wait while a cable ship crosses the ocean, and own up to eight fiber pairs outright. It pays for itself in a few years if it replaces enough leased waves. Whales may cause delays."];
+const RELEASE_NOTES=["Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
@@ -1642,7 +1642,7 @@ function compute(){
   R2.graceNets=0;if(S.grace&&S.grace.until>day){const gs=new Set(S.grace.nets.filter(n=>NET[n]&&!E.some(e=>e.k!=='c'&&e.ok(n)))),hc=popUp(S.home)?S.home:pops.find(popUp);
     R2.graceNets=gs.size;if(gs.size&&hc)E.push({k:'ix',pref:'normal',lab:tr('Courtesy route to new networks'),id:'~grace',city:hc,cap:1e9,used:0,rank:2,ok:n=>gs.has(n)});}
   {const rp=ev.rpki&&ev.rpki.until>day?new Set(ev.rpki.nets):null;if(rp)for(const e of E){if(e.k==='c')continue;const o=e.ok;e.ok=n=>!rp.has(n)&&o(n);}}
-  for(const n of NETS){R2.reachable[n.id]=E.some(e=>e.rank>0&&e.ok(n.id));if(R2.reachable[n.id])R2.reach+=NSH[n.id];}
+  R2.netPaths={};for(const n of NETS){const exits=E.filter(e=>e.rank>0&&e.ok(n.id));R2.netPaths[n.id]={direct:exits.some(e=>(e.k==='p'||e.k==='ix')&&e.id!=='~grace'),transit:exits.some(e=>e.k==='t'),grace:exits.some(e=>e.id==='~grace')};R2.reachable[n.id]=exits.length>0;if(R2.reachable[n.id])R2.reach+=NSH[n.id];}
   const cacheNets=new Set(S.caches.filter(c=>popUp(c.city)).map(c=>c.net));
   const viral=(ev.viral>day?1.25:1)*(ev.php&&ev.php>day?0.7:1);
   const flows=[];
@@ -2536,6 +2536,7 @@ const ACT={
    toast(`<b>${tr('{net} accepted!',{net:esc(NET[net].name)})}</b><br>${NET[net].pol==='selective'?tr('They checked your PearingDB page and liked the traffic numbers.'):tr('BGP session established.')}`,'good');sfx('build');after();},
  unpeer:({city,net})=>{delete S.peers[net+'@'+city];after();},
  peerAll:({city})=>{if(!isIx(city)||S.ixp[city]===undefined)return;const set=ixSessions(city);let n=0;for(const id of ixMembers(city))if(!set.has(id)&&peerOk(id,'ix',city).ok){S.peers[id+'@'+city]=true;n++;}if(!n)return;toast(trn('<b>{n} new session at {ix}.</b><br>Small networks, but they add up, and they all count towards the club.','<b>{n} new sessions at {ix}.</b><br>Small networks, but they add up, and they all count towards the club.',n,{ix:esc(ixName(city))}),'good');sfx('build');after();},
+ netFilter:({v})=>{if(!['all','missing','transit'].includes(v))return;UI.netFilter=v;renderLeft();},
  tailTog:()=>{UI.tailOpen=!UI.tailOpen;renderLeft();},
  pni:({city,net,tier})=>{tier=+tier;if(!S.pops[city]||!NET[net]||!NET[net].pops.includes(city)||!PORT[tier])return;if(!portOk(city,tier)){toast(tr("<b>Your router can't take a {port} port.</b><br>Upgrade it in the Infra tab.",{port:PORT[tier].n}),'bad');sfx('err');return;}const r=peerOk(net,'pni',city);if(!r.ok){toast(tr('<b>{net} declined the PNI.</b><br>{why}',{net:esc(NET[net].name),why:esc(r.why)}),'bad');sfx('err');return;}if(S.conf&&S.conf.until>S.day)S.stats.beerPni=1;
    const ex=S.pni.find(p=>p.city===city&&p.net===net);if(ex&&tier<=ex.tier)return;if(!portGate(city,ex?(PORT_SLOT(tier)-PORT_SLOT(ex.tier))*(ex.n||1):PORT_SLOT(tier)))return;if(!spend((1500+PORT[tier].setup/2)*(ex&&ex.n||1)))return;if(ex)ex.tier=tier;else S.pni.push({id:uid(),city,net,tier});
@@ -2866,10 +2867,14 @@ function renderLeft(){checkLayer();
   }else{
     h+=`<p class="lead">${tr("Every network on the map. Traffic share is how much of your users' traffic goes to them. Tap a connection to jump to its POP.")}</p>`;
     if(conns().length)h+=`<div class="btns" style="margin-bottom:8px">${btn(tr('All connections <small>{n}</small>',{n:conns().length}),'connOpen',{},'pink sm')}</div>`;
+    const filter=UI.netFilter||'all',state=n=>netReach(n.id),matches=(n,k)=>k==='all'||(k==='missing'?['none','grace'].includes(state(n)):state(n)==='transit');
+    h+=`<div class="seg">${[['all',tr('All')],['missing',tr('Missing routes')],['transit',tr('Transit only')]].map(([v,l])=>btn(`${l} <small>${NETS.filter(n=>matches(n,v)).length}</small>`,'netFilter',{v},filter===v?'pink sm':'ghost sm')).join('')}</div><p class="note">${tr('Available exits, not traffic volume. Missing routes includes temporary courtesy routes; cache hits do not replace full network reach.')}</p>`;
+    const visible=NETS.filter(n=>matches(n,filter)&&(filter!=='all'||!n.tail||UI.tailOpen));
+    if(!visible.length)h+=`<p class="empty">${tr('No networks match this filter.')}</p>`;
     const tl=NETS.filter(n=>n.tail),tlOn=tl.filter(n=>Object.keys(S.ixp).some(c=>ixSessions(c).has(n.id))).length;
-    for(const n of NETS){if(n.tail&&!UI.tailOpen)continue;
-      h+=`<div class="row">${logo(n)}<div class="grow"><div class="nm">${esc(n.name)} <span class="meta">AS${n.asn}</span></div><div class="meta"><span class="tag ${n.type}">${TYPE_L[n.type]}</span> <span class="tag ${n.pol}">${n.pol}</span> · ${tr('{p}% of traffic',{p:(NSH[n.id]*100).toFixed(1)})}${n.price?` · ${tr('transit ${price}/Gbps',{price:(n.price*S.priceMul).toFixed(2)})}`:''}</div><div class="meta">${esc(n.blurb)}</div>${netWhere(n)}<div class="btns">${btn(tr('Find PNI'),'pniFind',{net:n.id},'ghost sm')}</div></div></div>`;}
-    h+=`<div class="row"><div class="grow"><div class="nm">${tr('The long tail')} <span class="meta">${tr('{n} small networks',{n:tl.length})}</span></div><div class="meta">${tr('{p}% of traffic between them, scattered across exchanges. You peer with {n}.',{p:(tl.reduce((a,n)=>a+NSH[n.id],0)*100).toFixed(1),n:tlOn})}</div></div>${btn(UI.tailOpen?tr('Hide'):tr('Show'),'tailTog',{},'ghost sm')}</div>`;
+    for(const n of visible){
+      h+=`<div class="row">${logo(n)}<div class="grow"><div class="nm">${esc(n.name)} <span class="meta">AS${n.asn}</span></div><div class="meta"><span class="tag ${state(n)==='none'?'restrictive':state(n)==='direct'?'open':'paid'}">${netReachLabel(state(n))}</span></div><div class="meta"><span class="tag ${n.type}">${TYPE_L[n.type]}</span> <span class="tag ${n.pol}">${n.pol}</span> · ${tr('{p}% of traffic',{p:(NSH[n.id]*100).toFixed(1)})}${n.price?` · ${tr('transit ${price}/Gbps',{price:(n.price*S.priceMul).toFixed(2)})}`:''}</div><div class="meta">${esc(n.blurb)}</div>${netWhere(n)}<div class="btns">${btn(tr('Find PNI'),'pniFind',{net:n.id},'ghost sm')}</div></div></div>`;}
+    if(filter==='all')h+=`<div class="row"><div class="grow"><div class="nm">${tr('The long tail')} <span class="meta">${tr('{n} small networks',{n:tl.length})}</span></div><div class="meta">${tr('{p}% of traffic between them, scattered across exchanges. You peer with {n}.',{p:(tl.reduce((a,n)=>a+NSH[n.id],0)*100).toFixed(1),n:tlOn})}</div></div>${btn(UI.tailOpen?tr('Hide'):tr('Show'),'tailTog',{},'ghost sm')}</div>`;
   }
   if(h!==UI._lh){UI._lh=h;$('leftBody').innerHTML=h;}
 }
@@ -3242,6 +3247,9 @@ function connSection(){const all=conns(),F=UI.cf||{};
   h+=rows.map(r=>{const u=r.cap?r.use/r.cap:0,N=r.net&&NET[r.net];return `<tr${r.down?' style="opacity:.55"':''}><td><span class="tag" style="background:${CONN_COL[r.k]}">${tr(CONN_K[r.k])}</span></td><td>${esc(CITY[r.city].name)}</td><td><span style="display:inline-flex;align-items:center;gap:6px">${N?logo(N):''}<span><b>${esc(r.name)}</b>${r.note?`<br><span class="meta">${esc(r.note)}</span>`:''}</span></span></td><td>${esc(r.port)}${r.down?` <span class="tag restrictive">${tr('DOWN')}</span>`:r.low?` <span class="tag st">${tr('backup')}</span>`:''}</td><td class="r">${fmtG(r.use)} / ${fmtCap(Math.round(r.cap))}<div class="bar ${barCls(u)}" style="margin-top:3px"><i style="width:${Math.min(100,u*100)}%"></i></div></td><td class="r">${fmt$(r.mo)}</td><td>${btn(tr('Open'),'goConn',{city:r.city,k:r.k},'ghost sm')}</td></tr>`;}).join('');
   h+=`</tbody><tfoot><tr><td colspan="4"><b>${trn('{n} connection','{n} connections',rows.length)}</b></td><td class="r"><b>${fmtG(tu)} / ${fmtCap(Math.round(tc))}</b></td><td class="r"><b>${fmt$(tm)}</b></td><td></td></tr></tfoot></table></div></div>`;
   return h;}
+// Full-network exit coverage, including idle networks and temporary update routes.
+function netReach(id){const p=R.netPaths&&R.netPaths[id];return p&&p.direct?'direct':p&&p.transit?'transit':p&&p.grace?'grace':'none';}
+const netReachLabel=k=>k==='direct'?tr('Peering / PNI'):k==='transit'?tr('Transit only'):k==='grace'?tr('Courtesy route only'):tr('No route');
 // Where you connect to one network, as buttons that jump to the POP (Networks tab).
 function netWhere(n){const ch=[];
   for(const t of S.transit)if(t.net===n.id)ch.push([tr('Transit'),t.city,'t']);

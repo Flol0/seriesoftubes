@@ -2272,4 +2272,12 @@
 "{n} uplinks":"{n} uplink",
 "{n} uplink":"{n} uplink",
 "<b>Second router uplink added.</b><br>Your IX now has an uplink in each building.":"<b>Secondo uplink al router aggiunto.</b><br>Il tuo IX ora ha un uplink in ciascuna sede.",
+"Missing routes":"Rotte mancanti",
+"Transit only":"Solo transit",
+"Available exits, not traffic volume. Missing routes includes temporary courtesy routes; cache hits do not replace full network reach.":"Uscite disponibili, non volume di traffico. Le rotte mancanti includono le rotte di cortesia temporanee; i contenuti in cache non sostituiscono la raggiungibilità completa della rete.",
+"No networks match this filter.":"Nessuna rete corrisponde a questo filtro.",
+"Peering / PNI":"Peering / PNI",
+"Courtesy route only":"Solo rotta di cortesia",
+"No route":"Nessuna rotta",
+"All":"Tutte",
 };
