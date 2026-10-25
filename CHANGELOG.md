@@ -6,13 +6,13 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
-## [1.25.1-qol.2] — 2026-10-25
+## [1.25.2] — 2026-10-25
 
-- Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network.
-
-## [1.25.1-qol.1] — 2026-10-25
-
-- A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
+- Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a
+  cable landing station, pay a frankly rude amount of money, wait while a cable
+  ship crosses the ocean, and own up to eight fiber pairs outright. It pays for
+  itself in a few years if it replaces enough leased waves. Whales may cause
+  delays.
 
 ## [1.25.1] — 2026-10-25
 
@@ -588,6 +588,17 @@ First public release.
 - Cookieless Ridiculytics analytics on the live site only.
 
 ## Earlier local test builds
+
+### [1.25.1-qol.2] — 2026-10-25
+
+- Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network.
+
+### [1.25.1-qol.1] — 2026-10-25
+
+- A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve.
+
+
+
 
 ### [1.23.0-pwa.3] — 2026-10-25
 

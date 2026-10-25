@@ -399,3 +399,39 @@ test('#47 Cairo reaches Asia overland across the Sinai, priced like the Bosporus
   assert.equal(ev("isSub('cai','lon')"), true, 'the Channel is still the sea');
   assert.deepEqual(errors, []);
 });
+
+test('#22 Tier 1 networks can lay their own subsea cable', () => {
+  const { ev, dom, errors } = load();
+  ev("ACT.start({});S.cash=2e8;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'lon'});ACT.buildPop({city:'nyc'});compute()");
+  const card = () => dom.window.document.getElementById('modalCard').textContent;
+  // not before Tier 1
+  ev("UI.lmode='df';UI.via=null;openLinkModal('lon','nyc')");
+  assert.match(card(), /Tier 1 only/);
+  assert.match(ev("ownCabWhy('lon','nyc')"), /Tier 1/);
+  ev('ACT.orderCable()');
+  assert.equal(ev("S.links.filter(l=>l.own&&l.sub).length"), 0, 'refused before Tier 1');
+  // as a Tier 1
+  ev("S.won=true;ACT.ownCab()");
+  assert.match(card(), /frankly rude amount of money/);
+  assert.match(card(), /pays for itself in about \d+ months/);
+  const c0 = ev('S.cash'), km = ev("ownCabKm('lon','nyc')");
+  ev('ACT.orderCable()');
+  const l = JSON.parse(ev("JSON.stringify(S.links.find(l=>l.own&&l.sub))"));
+  assert.ok(l, 'the cable is being laid');
+  assert.equal(c0 - ev('S.cash'), ev(`ownCabCost(${km})`));
+  assert.ok(l.ready - ev('S.day') > 300, 'it takes a long time');
+  assert.equal(l.sys, 'roadm');
+  assert.ok(l.cname && l.cname.length > 3, 'it gets a name');
+  // finished: light it, fill a pair, light the next one; no mid-ocean regen
+  ev(`const L=S.links.find(x=>x.id==='${l.id}');S.day=L.ready;L.ch=Array(64).fill('tp16');compute()`);
+  ev(`ACT.regen({id:'${l.id}',d:1})`);
+  assert.equal(ev(`S.links.find(x=>x.id==='${l.id}').regen|0`), 0, 'no regen sites in the ocean');
+  ev(`ACT.addPair({id:'${l.id}'})`);
+  assert.equal(ev(`S.links.find(x=>x.id==='${l.id}').pairs`), 2);
+  assert.equal(ev(`pairsMax(S.links.find(x=>x.id==='${l.id}'))`), 8, 'up to eight pairs in a subsea cable');
+  // landing stations and China
+  const inland = ev("CITIES.find(c=>c.land==='eu'&&!landing(c.id)&&!cnCity(c.id)).id");
+  assert.match(ev(`ownCabWhy('${inland}','nyc')`), /landing station/, 'both ends need a landing station');
+  assert.match(ev("ownCabWhy('sha','sea')"), /China/);
+  assert.deepEqual(errors, []);
+});
