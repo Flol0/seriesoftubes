@@ -2219,4 +2219,10 @@
 "<b>Fiber pair {n} is lit: {a}–{b}.</b><br>Another ROADMaster 9000 and a fresh chain of amplifiers. Room for {m} more channels.":"<b>Coppia di fibre {n} accesa: {a}–{b}.</b><br>Un altro ROADMaster 9000 e una nuova catena di amplificatori. Spazio per altri {m} canali.",
 "{n} fiber pairs lit, the trench is full":"{n} coppie di fibre accese, il cavidotto è pieno",
 "Light fiber pair {n} <small>{price} + {mo}/mo</small>":"Accendi la coppia {n} <small>{price} + {mo}/mese</small>",
+"Router uplinks":"Uplink al router",
+"+ LAG member <small>{cost}</small>":"+ Membro LAG <small>{cost}</small>",
+"Extra router uplinks share the fabric capacity. They use router ports and can be split across both sites; the fabric’s monthly cost stays the same.":"Gli uplink aggiuntivi condividono la capacità della fabric. Occupano porte del router e possono essere distribuiti tra entrambe le sedi; il costo mensile della fabric non cambia.",
+"{n} uplinks":"{n} uplink",
+"{n} uplink":"{n} uplink",
+"<b>Second router uplink added.</b><br>Your IX now has an uplink in each building.":"<b>Secondo uplink al router aggiunto.</b><br>Il tuo IX ora ha un uplink in ciascuna sede.",
 };
