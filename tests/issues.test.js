@@ -539,3 +539,20 @@ test('#35 your own trench can light another fiber pair once a ROADMaster is full
   assert.equal(ev('S.links[0].pairs'), 4, 'saves are clamped to four pairs');
   assert.deepEqual(errors, []);
 });
+
+test('link redundancy trials distinguish a bridge, a full fallback and a healthy alternate path without changing the game',()=>{
+ const {ev,errors}=load();
+ ev("ACT.start({});S.cash=1e8;ACT.buildPop({city:'bde'});ACT.buildPop({city:'ams'});S.biz=[{id:'circuit',name:'Test Circuit',type:'l2vpn',city:'fra',city2:'bde',bw:80,rate:1,reqs:[]}];S.links=[{id:'main',a:'fra',b:'bde',kind:'wave',tier:1,km:100,mo:100,cut:0,trench:'main'}];compute();window.state=JSON.stringify(S);window.live=R;window.hot=UI.hotMap;window.cache=TE_CACHE");
+ let t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,true);assert.equal(t.loss,80);
+ assert.equal(ev('JSON.stringify(S)'),ev('state'));assert.equal(ev('R===live&&UI.hotMap===hot&&TE_CACHE===cache'),true);
+ ev("S.links.push({id:'a',a:'fra',b:'ams',kind:'wave',tier:0,km:100,mo:100,cut:0},{id:'b',a:'ams',b:'bde',kind:'wave',tier:0,km:100,mo:100,cut:0});compute()");
+ t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,70);assert.equal(t.busy.length,2);
+ ev("S.links[1].tier=1;S.links[2].tier=1;compute()");t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,0);
+ ev("S.links[1].cut=S.day+5;compute()");assert.equal(ev("linkTrial('main').split"),true,'existing failures are respected');assert.equal(ev("linkTrial('a')"),null,'an already failed link is not tested');
+ ev("S.links=S.links.slice(0,1);S.links.push({...S.links[0],id:'parallel'});compute()");assert.equal(ev("linkTrial('main').split"),false,'only the selected link fails even when a trench is shared');assert.equal(ev("linkTrial('main').loss"),0);
+ ev("S.links[0]={...S.links[0],kind:'df',sys:'roadm',ch:['tp16'],pairs:1,regen:0,ready:0,own:true};compute()");assert.equal(ev("linkTrial('main').loss"),0,'dark fiber is tested as one link');
+ ev("window.innerWidth=360;ACT.linkCheck({id:'main'})");assert.match(ev("$('modalCard').textContent"),/One backhoe is not enough/);assert.equal(ev("$('modal').className"),'link-check');ev("ACT.phoneTab({t:'noc'})");assert.equal(ev("$('modal').hidden"),true);
+ ev("S.links[0]={...S.links[0],kind:'vxc',vt:1,prov:FABS[0].id};compute()");assert.equal(ev("linkTrial('main').loss"),0,'virtual circuits are tested individually');
+ ev("window.saveRef=S;window.liveRef=R;window.originalCompute=compute;compute=()=>{throw Error('trial failed')}");assert.throws(()=>ev("linkTrial('main')"),/trial failed/);ev('compute=originalCompute');assert.equal(ev('S===saveRef&&R===liveRef'),true,'even a failed trial restores the live state');
+ assert.deepEqual(errors,[]);
+});

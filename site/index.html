@@ -427,6 +427,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
   #coach{top:auto !important;bottom:calc(var(--tabbar) + 8px);width:calc(100% - 16px);padding:7px 10px;font-size:13px}
   body.sheet-open #coach{bottom:calc(var(--tabbar) + 8px + min(62vh,520px))}
   #modal{align-items:end;padding:0}
+  #modal.link-check{bottom:var(--tabbar)}
   #modal .cta{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));z-index:1;background:var(--paper);margin:12px -16px 0 !important;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--line)}
   .title-art h1{font-size:34px}.title-art svg{width:54px;height:54px}
   .tagline{font-size:13.5px;margin:8px 0 10px}
@@ -2443,6 +2444,7 @@ function checkGoals(){checkBadges();
 /* ================= ACTIONS ================= */
 function spend(c){if(S.cash<c){toast(tr('<b>Not enough cash.</b><br>Wait for revenue, or speed up time.'),'bad');sfx('err');return false;}S.cash-=c;sfx('build');return true;}
 const ACT={
+ linkCheck:({id})=>{const l=S.links.find(x=>x.id===id);if(!l||linkDown(l))return;linkCheckModal(l);},
  speed:({v})=>{v=+v;if(![0,0.5,1,2,4,8].includes(v))return;if(v)UI.lastSpeed=v;UI.speed=v;renderHUD();},
  help:()=>showHelp(),
  dash:()=>{if(!S)return;const d=$('dash');d.hidden=!d.hidden;if(!d.hidden)renderDash();},
@@ -2470,7 +2472,7 @@ const ACT={
  tab:({t})=>{UI.tab=t;UI.confirm=null;renderPanel();},
  leftTab:({t})=>{UI.left=t;UI.leftOpen=true;renderLeft();},
  toggleLeft:()=>{UI.leftOpen=!UI.leftOpen;renderLeft();},
- phoneTab:({t})=>{if(!['goals','deals','noc','nets'].includes(t))return;haptic(8);if(UI.leftOpen&&UI.left===t&&!UI.sel){UI.leftOpen=false;}else{UI.left=t;UI.leftOpen=true;UI.sel=null;renderPanel();}$('left').classList.remove('full');renderLeft();},
+ phoneTab:({t})=>{if(!['goals','deals','noc','nets'].includes(t))return;if($('modal').classList.contains('link-check'))closeModal();haptic(8);if(UI.leftOpen&&UI.left===t&&!UI.sel){UI.leftOpen=false;}else{UI.left=t;UI.leftOpen=true;UI.sel=null;renderPanel();}$('left').classList.remove('full');renderLeft();},
  phonePlay:()=>{haptic(10);if(UI.speed){UI.lastSpeed=UI.speed;UI.speed=0;}else UI.speed=UI.lastSpeed||1;renderHUD();},
  phoneSpeed:()=>{haptic(8);const cur=UI.speed||UI.lastSpeed||1,i=SPEEDS.indexOf(cur),n=SPEEDS[(i+1)%SPEEDS.length];UI.speed=n;UI.lastSpeed=n;renderHUD();},
  install:()=>{if(installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;});return;}
@@ -3041,9 +3043,25 @@ function vxcPanel(l){
   return h;
 }
 function prefCtl(kind,id,cur){cur=cur||'normal';return `<div class="btns"><span class="meta" style="align-self:center">${tr('Egress:')}</span>${Object.keys(PREF).map(v=>btn(PREF[v],'setPref',{kind,id,v},cur===v?'pink sm':'ghost sm')).join('')}</div>`;}
+// Trial routing is isolated from the live save, counters and scenic-route memory.
+function linkTrial(id){const save=S,live=R,hot=UI.hotMap,cache=TE_CACHE;
+  try{S=JSON.parse(JSON.stringify(save));const l=S.links.find(x=>x.id===id);if(!l||linkDown(l))return null;
+    compute();const before=R;l.cut=S.day+1;compute();
+    const allowed=new Set(Object.keys(S.pops).filter(popUp).concat(remoteCities())),adj={};
+    for(const x of S.links)if(!linkDown(x)&&allowed.has(x.a)&&allowed.has(x.b)){(adj[x.a]=adj[x.a]||[]).push(x.b);(adj[x.b]=adj[x.b]||[]).push(x.a);}
+    const seen=new Set([l.a]),q=[l.a];for(let i=0;i<q.length;i++)for(const c of adj[q[i]]||[])if(!seen.has(c)){seen.add(c);q.push(c);}
+    const losses=[];for(const c in S.pops){const g=Math.max(0,(before.citySrv[c]||0)-(R.citySrv[c]||0));if(g>.01)losses.push({name:CITY[c].name,g});}
+    for(const b of S.biz)if(BIZ_T[b.type].l2){const g=Math.max(0,(before.l2[b.id]||0)-(R.l2[b.id]||0));if(g>.01)losses.push({name:b.name,g});}
+    const busy=S.links.filter(x=>x.id!==id&&!linkDown(x)&&capOf(x)>0&&(R.load[x.id]||0)/capOf(x)>=.995).map(x=>({name:CITY[x.a].name+' ⇄ '+CITY[x.b].name,g:R.load[x.id]||0,cap:capOf(x)}));
+    return {split:!seen.has(l.b),loss:losses.reduce((a,x)=>a+x.g,0),losses,busy,day:S.day};
+  }finally{S=save;R=live;UI.hotMap=hot;TE_CACHE=cache;}}
+function linkCheckModal(l){const t=linkTrial(l.id);if(!t)return;
+  const title=t.split?tr('This backhoe wins.'):t.loss>.01?tr('Connected, but tight.'):tr('One backhoe is not enough.');
+  openModal(`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h2>${tr('Redundancy check')}</h2><button class="x" data-act="closeModal" aria-label="${tr('Close')}">×</button></div><p class="eyebrow">${esc(CITY[l.a].name)} ⇄ ${esc(CITY[l.b].name)} · ${dateStr(t.day)}</p><div class="inc" style="background:${t.split?'#FFE3E3':t.loss>.01?'#FFF6CF':'#EAF7EE'}"><div class="nm">${title}</div><p class="lead">${t.split?tr('No alternate backbone path connects these endpoints if this link fails.'):t.loss>.01?tr('An alternate path exists, but current routing and capacity deliver less traffic.'):tr('With current demand and routing, this link can fail without additional traffic loss.')}</p><div class="kv"><span>${tr('Additional traffic lost')}</span><b>${fmtG(t.loss)}</b></div></div>${t.losses.length?`<h3>${tr('Service affected')}</h3>${t.losses.map(x=>`<div class="kv"><span>${esc(x.name)}</span><b>−${fmtG(x.g)}</b></div>`).join('')}`:''}${t.busy.length?`<h3>${tr('Full links during the test')}</h3>${t.busy.slice(0,6).map(x=>`<div class="kv"><span>${esc(x.name)}</span><b>${fmtG(x.g)} / ${fmtG(x.cap)}</b></div>`).join('')}`:''}<p class="note">${tr('Snapshot only: one selected link fails. Other links on the same cable, trench or fabric stay up. Existing outages and routing rules still apply. No time, money or game state is changed.')}</p><div class="btns">${btn(tr('Close'),'closeModal',{},'ghost')}</div>`,'link-check');}
+function linkCheckControl(l){return `<section><h3>${tr('Redundancy check')}</h3><p class="note">${tr('What happens if this link fails right now?')}</p>${btn(tr('Check redundancy'),'linkCheck',{id:l.id},'ghost sm',linkDown(l))}</section>`;}
 function trafficSection(l){
   const rec=R.ef[edgeKey(l)],n=pairLinks(l.a,l.b).length;
-  let h=`<section><h3>${tr("What's on this link")}</h3>`;
+  let h=linkCheckControl(l)+`<section><h3>${tr("What's on this link")}</h3>`;
   if(!rec){return h+`<p class="empty">${tr('No traffic right now.')}</p></section>`;}
   const tot=Object.values(rec.net).reduce((a,b)=>a+b,0)||1;
   const nets=Object.entries(rec.net).sort((a,b)=>b[1]-a[1]);
@@ -3297,7 +3315,7 @@ function toast(html,kind='',actions=[]){
 const markLayer=()=>{UI.layerAt=performance.now();};
 // Which layers are open: when that changes (a sheet, the dashboard, the bank, a selection), taps in flight are void.
 function checkLayer(){const q=id=>{const e=$(id);return e?(e.hidden?0:1):0;},sig=[q('modal'),q('dash'),q('bankBox'),UI.leftOpen?1:0,UI.left||'',UI.sel?UI.sel.type+UI.sel.id:'',UI.tab||''].join('|');if(sig!==UI._layer){UI._layer=sig;markLayer();}}
-function openModal(html){if($('modal').hidden)markLayer();$('modalCard').innerHTML=html;$('modal').hidden=false;}
+function openModal(html,cls=''){$('modal').className=cls;$('modalCard').setAttribute('aria-modal',cls==='link-check'&&isPhone()?'false':'true');if($('modal').hidden)markLayer();$('modalCard').innerHTML=html;$('modal').hidden=false;}
 function closeModal(){if(!$('modal').hidden)markLayer();$('modal').hidden=true;UI.pending=null;}
 const NETWORK_NAMES=[
   'Packet Pals','Shinternet','Post, Telegraph & Tubes','Peering Pressure','Best Effort Telecom',

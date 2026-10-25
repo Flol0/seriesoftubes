@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+- Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network.
+
 ## [1.25.2] — 2026-10-25
 
 - Tier 1 networks can lay their own subsea cable (#22). Pick two cities with a
