@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+- Find where a network offers PNIs from the Networks list or NOC traffic table, with your own POPs first and a shortcut to each city (#12).
+
 ## [1.25.0] — 2026-10-25
 
 - Your own trench can carry more than one fiber pair (#35). Once a ROADMaster

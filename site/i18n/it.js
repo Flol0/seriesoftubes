@@ -2219,4 +2219,9 @@
 "<b>Fiber pair {n} is lit: {a}–{b}.</b><br>Another ROADMaster 9000 and a fresh chain of amplifiers. Room for {m} more channels.":"<b>Coppia di fibre {n} accesa: {a}–{b}.</b><br>Un altro ROADMaster 9000 e una nuova catena di amplificatori. Spazio per altri {m} canali.",
 "{n} fiber pairs lit, the trench is full":"{n} coppie di fibre accese, il cavidotto è pieno",
 "Light fiber pair {n} <small>{price} + {mo}/mo</small>":"Accendi la coppia {n} <small>{price} + {mo}/mese</small>",
+"Find PNI":"Trova PNI",
+"PNI locations":"Sedi per PNI",
+"Physical presence, not a peering promise. Each location still has its own traffic requirements and peering policy.":"Presenza fisica, non una promessa di peering. Ogni sede mantiene i propri requisiti di traffico e la propria policy di peering.",
+"PNI already installed":"PNI già installato",
+"No PNI locations listed.":"Nessuna sede per PNI elencata.",
 };
