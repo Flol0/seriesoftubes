@@ -6,7 +6,14 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
-- Installed iOS apps keep the game toolbar clear from startup: use a normal status bar and a solid top edge, without stretching the bottom navigation past the viewport.
+- Installed iOS apps keep the game toolbar clear from startup:
+  use a normal status bar and a solid top edge, without stretching the
+  bottom navigation past the viewport.
+
+## [1.25.1] — 2026-10-25
+
+- Once you have half a billion in the bank, the banks stop sending loan offers
+  (#52). They come back if your cash drops below that again.
 
 ## [1.25.0] — 2026-10-25
 

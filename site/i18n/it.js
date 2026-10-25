@@ -2219,4 +2219,5 @@
 "<b>Fiber pair {n} is lit: {a}–{b}.</b><br>Another ROADMaster 9000 and a fresh chain of amplifiers. Room for {m} more channels.":"<b>Coppia di fibre {n} accesa: {a}–{b}.</b><br>Un altro ROADMaster 9000 e una nuova catena di amplificatori. Spazio per altri {m} canali.",
 "{n} fiber pairs lit, the trench is full":"{n} coppie di fibre accese, il cavidotto è pieno",
 "Light fiber pair {n} <small>{price} + {mo}/mo</small>":"Accendi la coppia {n} <small>{price} + {mo}/mese</small>",
+"<b>The banks have stopped calling.</b><br>You have more money than most of them. Loan offers come back if your cash ever drops below {cash}.":"<b>Le banche hanno smesso di chiamare.</b><br>Hai più soldi della maggior parte di loro. Le offerte di prestito tornano se la tua cassa scende sotto {cash}.",
 };

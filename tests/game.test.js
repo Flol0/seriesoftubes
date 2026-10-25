@@ -299,3 +299,16 @@ test('DDoS goal and badges unlock from the right state', () => {
   assert.equal(ev("R.served=999999;BADGES.find(b=>b.id==='petabit').ok()"), false, 'just under a petabit is not enough');
   assert.equal(ev("R.served=1e6;BADGES.find(b=>b.id==='petabit').ok()"), true, 'a petabit per second earns it');
 });
+
+test('#52 loan offers stop once you have half a billion in the bank, and come back if you lose it', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.day=100;S.cash=6e8;S.loanOffers=[{id:'x',bank:Object.keys(BANKS)[0],amount:1e5,exp:200}]");
+  for (let i = 0; i < 60; i++) ev('S.day++;loanTick(S.day)');
+  assert.equal(ev('S.loanOffers.length'), 0, 'no offers while rich');
+  assert.match(ev("document.getElementById('toasts').textContent"), /stopped calling/);
+  ev('S.cash=-5e4');
+  let seen = 0;
+  for (let i = 0; i < 40; i++) seen += ev('S.day++;loanTick(S.day);S.loanOffers.length') > 0 ? 1 : 0;
+  assert.ok(seen > 0, 'broke again: the banks are back');
+  assert.deepEqual(errors, []);
+});

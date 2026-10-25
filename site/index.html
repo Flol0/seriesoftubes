@@ -1274,8 +1274,11 @@ function loanTick(d){
   // offers: now and then, and much more often when you are in trouble
   S.loanOffers=S.loanOffers.filter(o=>o.exp>d);
   const broke=S.cash<0;
+  // With half a billion in the vault, loan offers are just noise (#52): banks stop calling, open offers lapse.
+  if(S.cash>=RICH_NO_LOANS){if(S.loanOffers.length||!S.richTold){S.loanOffers=[];if(!S.richTold&&S.mode!=='sandbox'){S.richTold=1;toast(tr('<b>The banks have stopped calling.</b><br>You have more money than most of them. Loan offers come back if your cash ever drops below {cash}.',{cash:fmt$(RICH_NO_LOANS)}),'good');}}return;}
   if(S.loanOffers.length<4&&(broke?Math.random()<0.25:(d>20&&Math.random()<1/40)))spawnLoanOffer(broke);
 }
+const RICH_NO_LOANS=5e8;
 /* Seeded games (scenarios, weekly challenge) draw every random number from S.rng, so the same seed
    gives the same world. Free play keeps using the browser's Math.random. */
 const _rand=Math.random;
