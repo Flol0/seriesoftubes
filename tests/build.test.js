@@ -28,7 +28,7 @@ test('version.json carries the release notes from the changelog', () => {
 
 test('head carries the SEO and social metadata', () => {
   const html = fs.readFileSync(path.join(root, 'site', 'index.html'), 'utf8');
-  for (const needle of ['<link rel="canonical" href="https://tubes.krieger.pm/">', 'property="og:image"', 'name="twitter:card"', 'application/ld+json', 'rel="manifest"', 'name="description"']) {
+  for (const needle of ['<link rel="canonical" href="https://seriesoftub.es/">', 'property="og:image"', 'name="twitter:card"', 'application/ld+json', 'rel="manifest"', 'name="description"']) {
     assert.ok(html.includes(needle), `missing ${needle}`);
   }
   for (const block of html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {

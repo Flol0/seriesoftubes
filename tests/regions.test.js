@@ -377,3 +377,12 @@ test('more UK and Norway: Manchester, Edinburgh, Bude and Stavanger with North S
   assert.ok(ev("['btt','sky','vmo'].every(n=>NET[n].pops.includes('man'))"));
   assert.deepEqual(errors, []);
 });
+
+test('#41 real coastlines: every city is on land, and the far view drops tiny islands but keeps every city', () => {
+  const { ev, errors } = load();
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(CITIES.filter(c=>!onLand(c.x,c.y)).map(c=>c.id))')), [], 'no city in the sea');
+  assert.ok(ev('LANDP_FAR.length') < ev('LANDP_ALL.length'), 'the far view is simpler');
+  assert.equal(ev('CITIES.every(c=>COAST.some((p,i)=>inPoly(c.x,c.y,p)&&LANDP_FAR.includes(LANDP_ALL[i])))'), true, 'no city loses its island when zoomed out');
+  ev('ACT.start({});cam.z=0.5;draw(0);cam.z=2;draw(0)');
+  assert.deepEqual(errors, []);
+});

@@ -6,18 +6,155 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.22.0] — 2026-10-25
+
+- Scenarios show their goal and your progress at all times (#34): a card at the
+  top of the Goals tab breaks the goal into steps with progress bars and shows the
+  days left. The top bar on desktop, and the Goals tab on phones, show how far you
+  are.
+- Your customer level is always visible too: a card in the Goals tab shows what
+  the next level unlocks and how close you are to it, and the Rank box shows
+  your level.
+- The NOC dashboard has tabs: Overview, Customers, Connections, Traffic and
+  Links & routers, so you no longer scroll through everything at once.
+- The share card draws links that cross the Pacific on both edges of the map
+  (#42).
+
+## [1.21.0] — 2026-10-25
+
+- The world map now has real coastlines (#41, thanks @aulmaru). Greenland, the
+  Arctic, Indonesia, the Philippines, Japan, Madagascar, Tasmania and New
+  Zealand show up properly, and the Mediterranean, Black Sea, Red Sea, Gulf and
+  Baltic have their real shapes. Zoomed out, the tiniest islands are left off so
+  the map stays readable.
+
+## [1.20.0] — 2026-10-25
+
+- A proper Settings screen, from the menu or the title screen: alerts, animations,
+  sound and language in one place, saved on your device.
+- The game can pause when a customer turns furious, so you no longer lose
+  customers to a notification you missed at 8× speed (#13). It is on by
+  default and can be switched off in Settings, where you can also choose to
+  pause on outages that cost you real traffic.
+- Customer happiness is easier to keep an eye on (#15). You get an early warning
+  when a customer drops below 60%, with the reason. A Customers box in the top bar
+  (on phones, a red count on Deals) shows how happy they are overall.
+- A Customers list in the NOC dashboard shows everyone who pays you, unhappiest
+  first, with what they pay, whether they are getting happier or angrier, and
+  exactly what is wrong. Filter it to the unhappy ones or by city, and tap Open
+  to go to them (#14).
+
+## [1.19.0] — 2026-10-25
+
+- See all your connections in one place (#31, #33, #38): a new Connections list
+  in the NOC dashboard shows every transit port, PNI, IX port, cache and fabric
+  port, with where it is, how full it is and what it costs each month. Filter it
+  by type, city or network, and tap Open to go straight to it. In the Networks
+  tab, each network now shows where you connect to it, one tap away.
+- On a phone, the game now explains why it is better installed as an app before
+  you start a new network: full screen, offline, and on iPhone a save that
+  Safari won't clear. It shows exactly how to add it to your home screen,
+  and warns that on iPhone a game started in the browser stays there. You can
+  still play in the browser.
+
+## [1.18.4] — 2026-10-25
+
+- The iPhone home-screen fix from 1.18.3 now stays in place. Before, it worked
+  at launch and then the empty strip under the tab bar came back.
+
+## [1.18.3] — 2026-10-25
+
+- Installed on an iPhone home screen, the game now fills the whole screen. Before,
+  the tab bar floated above an empty strip at the bottom.
+
+## [1.18.2] — 2026-10-25
+
+- A new legendary badge, A Petabit a Second, for serving a full petabit per
+  second (a thousand terabits) of happy traffic.
+
+## [1.18.1] — 2026-10-25
+
+- New goal and badges for DDoS defence: a goal to stand up your first
+  scrubbing center, and badges for weathering an attack, holding a
+  multi-terabit flood, running a clean-pipe or a sacrificial PNI, blackholing
+  your own city, and landing a HackBack that actually works.
+
+## [1.18.0] — 2026-10-25
+
+- Overland waves between continents (Europe to the Middle East and Asia) now cost
+  45× the normal price, about ten times the subsea route or more, as in real life.
+  Dark fiber pairs aren't sold on those routes at all (#40). Links you already
+  lease keep their price.
+- No more limit of four cache boxes per CDN in a POP: each box takes a router
+  port, and free ports are now the only limit (#39).
+- Scrubbing centers now come in tiers — 100G, 1T and 10T of clean bandwidth.
+  A center cleans an attack only up to its capacity; a bigger flood leaks the
+  rest past. Centers can run always-on, or cheaper on-demand, which takes a
+  couple of days to engage once an attack starts.
+- Transit clean-pipe add-on. Turn it on for a transit port and the provider
+  scrubs a flood entering there before it ever reaches you, for a monthly fee
+  per port.
+- Sacrificial PNI. Mark a Chinese PNI as a deliberate choke point: a flood
+  arriving over it dies on the small port instead of flooding your core, but
+  legitimate traffic across it runs at half capacity.
+- IX blackhole. A new mitigation on the live attack panel: announce the
+  victim to the exchange and about half the members drop the junk — the
+  customer stays up, unlike a full RTBH.
+- Selling DDoS protection now carries an SLA: if a protected customer's city
+  is hit and still goes down, you pay out an SLA credit and they get unhappy.
+
+## [1.17.1] — 2026-10-25
+
+- Flowspec is now a property of your router, not a licence you buy once. The
+  drop rules live in hardware (TCAM), and the budget differs by model: the
+  used Rusty Router can't do it at all, merchant-silicon and whitebox models
+  filter a known flood part-way, and the big chassis knock it right down. The
+  NOC shows how many of your POPs are Flowspec-capable, and the live attack
+  panel names the router doing (or not doing) the filtering.
+
+## [1.17.0] — 2026-10-25
+
+- DDoS attacks now have a shape: a vector (DNS reflection, NTP or CLDAP
+  amplification, SYN or HTTP flood), a size from a few Gbps up to a
+  multi-terabit "botnet of toasters" monster, a target POP, a duration, and
+  an entry point among that city's uplinks. Most are modest spikes; the big
+  ones are rare.
+- A DDoS toolbox in the NOC. A live attack panel shows the vector, size,
+  entry and what each mitigation is doing right now:
+  - **RTBH** — free and instant, but it blackholes the victim, so the
+    attack and the customer both go dark. Earns the Collateral Damage badge.
+  - **Flowspec** — a one-time licence that drops known UDP floods (DNS, NTP,
+    CLDAP, SYN) at your edge. Precise, but useless against an HTTP flood, and
+    the junk still fills the port it enters.
+  - **Scrubbing center** — cleans attacks network-wide, as before, and still
+    risks the GRE/MSS black hole.
+  - **HackBack 3000™ by Skynot AI** — a tempting red button. Sometimes it
+    ends the attack; more often it flattens an innocent and earns you a
+    regulator fine and the Vigilante badge. Hack-back is illegal in reality.
+
+## [1.16.0] — 2026-10-25
+
+- Customers on interconnection fabrics. Companies already on Megapork,
+  PocketFabric or Consolation Connect ask to buy transit from you over the
+  fabric, or for a circuit from the fabric to one of your POPs. Both come in
+  through your NNI port in that city, so you need a port there with room for
+  them.
+
 ## [1.15.0] — 2026-10-25
 
-- Integrated upstream 1.11–1.14: phone tab bar and draggable sheets, offline
-  installation, refreshed icons, Italian, random network names, community IXs,
-  and Barcelona, Manchester, Edinburgh, Bude and Stavanger with new cables.
-- Added the Korean sender-pays market, a sixth Tier 1 for new games, regional
-  optical-control failures, LACP trouble, partial packet loss and PMTUD faults.
-- Adopted upstream long-haul optical modes and explicit regeneration sites,
-  preserving full-rate channels in existing saves. Scenic routing is stable.
-- Retained power, automatic maintenance, hosting/scrubbing, scalable caches,
-  service switches, customer growth, warnings and proprietary submarine cables.
-
+- The map gets cleaner as you zoom out (#37): cities turn into dots, your POPs
+  into small router pills, links get thinner, and only your own cities keep
+  their labels. Up close, a POP shows your router instead of the skyline,
+  and a city with a second building shows a small router B on its metro
+  ring, so dual-site POPs stand out.
+- Parallel waves on the same cable or in the same trench draw as one line
+  with a combined label, like "8×6.4T · 7/8 up" (#19).
+- Decommission POPs, one at a time or several at once, from the Infra tab.
+  Everything in them goes, and customers who depended on them are let go
+  with three months of their contract as an early-termination penalty.
+- Dark fiber panels now list the other links between the two cities and can
+  add a parallel link, like waves already could.
+- NLNOG Day joins the conference calendar, in Amsterdam every September (#32).
 
 ## [1.14.0] — 2026-10-24
 
@@ -396,108 +533,3 @@ First public release.
 - Dozens of failure types and geopolitical events, a NOC with an event log, and
   a NOC dashboard with traffic, money and per-ASN graphs.
 - Cookieless Ridiculytics analytics on the live site only.
-
-
-## Earlier fork releases
-
-### [1.14.0] — 2026-10-24
-
-- Optional service-switch banks aggregate cache boxes and hosting rack handoffs.
-  Three models provide 48, 96 or 256 access ports per bank. Only uplinks use
-  router ports; a shared service traffic budget limits actual throughput.
-  Existing saves retain direct attachment until switches are installed.
-- Expand banks, upgrade access and uplink speeds, or bundle up to 64 uplinks
-  per chassis. Every purchase previews capacity, port needs and recurring
-  costs. Switches and uplinks add power and operating costs.
-- Pair each bank for redundant attachment. Access slots are not double-sold;
-  both chassis contribute uplink bandwidth. Automatic maintenance rolls one
-  chassis at a time. Failures are replaced automatically, and separate POP
-  sites protect paired members from a local building outage. Spare uplink
-  capacity is still needed when a member is offline.
-- Hosting and Infra show a POP capacity overview. The NOC compares service
-  access ports and actual uplink use, flags busy service uplinks, and includes
-  them in the configurable 100% circuit-load pause.
-
-
-### [1.13.0] — 2026-10-24
-
-- Tier 1 networks can build proprietary submarine cables along surveyed sea
-  corridors. Pay for construction, ROADMs and wet repeaters, wait for laying,
-  then install up to 64 independent 400G wet-plant channels. No wave rent;
-  upkeep, failures, regional risks and landing permits still apply. Sandbox
-  also unlocks cable construction.
-- Terrestrial dark fiber extends beyond 4,000 km using level-4 ROADMs and
-  per-channel optical regeneration. Extra hardware and monthly site costs
-  scale with the number of spans rather than imposing a fixed distance cap.
-- Completed the Italian routes requested in upstream #21: Rome to Milan via
-  Genoa, Palermo and Marseille; Palermo joins the FEA-ish and SEE-ME-WAVE 4-ish
-  corridors. Milan has RisottIX and Rome has CarbonarIX.
-- City-panel tabs wrap within the drawer on laptops and tablets, keeping
-  Hosting visible without overflowing the panel.
-
-
-### [1.12.0] — 2026-10-24
-
-- Caches grow beyond four boxes. Add one or ten at a time, or upgrade the
-  interfaces from 100G to 400G and 1.6T. Boxes share a scalable pool instead
-  of creating thousands of routing exits. Router ports, service fees and
-  metered electricity still matter; overflow uses peering or transit.
-- Full circuits pause the game at 100% load, with an Inspect shortcut. Resume
-  without repeated interruptions: a circuit re-arms only below 90% load.
-  Disable this independently of customer warnings in Settings.
-- Customers can request bandwidth expansions with 30 days' notice. Accept to
-  schedule the extra capacity and revenue, or keep the current contract.
-  Nothing changes automatically; accepted expansions get 15 days of grace.
-- Tablet double taps no longer trigger default page zoom. Pinch zoom still
-  works, lifting one finger resumes panning, and the menu can reset the map.
-- Ten new hubs fill gaps: Vancouver, Winnipeg, Casablanca, Dakar, Accra,
-  Luanda, Dar es Salaam, Tashkent, Almaty and Hanoi. They include transit,
-  local peering, fabric access and three game-world coastal cable systems.
-- Endgame room: a 204.8T modular router, up to 64 routers and LAG members,
-  256 racks per POP, 1.6T fabrics and virtual circuits, and 409.6T own IXs.
-  Parallel waves and fiber remain available for further backbone growth.
-- Fixed North American power tariffs using the wrong region key, invalid NNI
-  and circuit data breaking imported saves, and phantom router capacity
-  when no router remained available.
-
-
-### [1.11.0] — 2026-10-24
-
-- Power is a real operating cost now. Routers, caches, optical gear and
-  servers draw power, cooling adds 35%, and each city has its own tariff.
-  Check the Power & cooling section in Infra or compare POPs in the NOC.
-- UPS batteries bridge one game day, generators burn diesel while the grid
-  is down, and an independent second feed protects against local faults.
-  Regional blackouts can take both feeds down. Batteries must recharge.
-- Maintenance happens automatically. The NOC gives seven days' notice;
-  redundant routers are serviced and swapped one at a time without customer
-  impact. A single router goes down for a day. Generator and server service
-  is automatic too, and optical channels periodically need maintenance.
-- A full NOC event log remembers the latest 300 entries, including recovery,
-  maintenance and customer changes. Filter by category or search by city.
-- Open server rooms: buy 20U racks, rent units to colocation tenants, or
-  install your own web, cloud and DDoS scrubbing servers. New customers arrive
-  weekly when service is healthy. Hosting brings traffic, power bills,
-  operating costs, revenue and satisfaction; poor service causes churn.
-- Scrubbing is capacity-limited and depends on power and a live backbone
-  path. Existing centers remain 400G appliances; extra servers add 100G each,
-  limited by the POP's forwarding capacity. Attacks above capacity still hurt.
-- Existing saves get sensible defaults and a fresh maintenance schedule.
-
-
-### [1.10.1] — 2026-10-24
-
-- Your customers have a dashboard now: every contract, satisfaction, revenue,
-  service problem and requirement, sortable and one click away from its city (#14).
-- Satisfaction stays in the top bar, warns before customers are furious, and
-  pauses the game when they become furious. Turn auto-pause off in Settings (#13, #15).
-- Find PNI meet-me rooms from transit destinations and the NOC, including cities
-  you have not built in yet and the reason a network will not peer with you (#12).
-- Parallel waves on one cable segment share a map line and a combined capacity
-  label. Open the line to inspect and manage each wave separately (#19).
-- Local breakout accepts PNIs too (#20). Shark-averse customers no longer ask
-  for land paths across oceans (#16). Dark fiber orders beyond the reach of
-  every available optic are refused before you pay for the trench (#17).
-- Rival IX outages and de-peering notices no longer mistake exchange IDs for
-  cities. Auto-pause stops the remaining days in a fast simulation frame.
-- Updated from upstream 1.10.0 and published for tubes.krieger.pm.

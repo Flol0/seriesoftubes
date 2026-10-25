@@ -164,7 +164,7 @@ test('rare badges hook into incidents and deals', () => {
 test('#7 NOC legend, sortable network table and transit destinations', () => {
   const { ev, errors } = load();
   base(ev);
-  ev("ACT.buyTransit({city:'fra',net:'cog',tier:1});compute();ACT.dash()");
+  ev("ACT.buyTransit({city:'fra',net:'cog',tier:1});compute();ACT.dash();ACT.dashTab({k:'traffic'})");
   let t = ev("document.getElementById('dashCard').textContent");
   assert.match(t, /Who your transit carries/);
   assert.match(t, /IX peering/, 'legend explains the colours');
@@ -283,5 +283,209 @@ test('an optical control plane meltdown darkens every leased wave in a region, n
   assert.ok(ev(`${inc}.cost>0`));
   ev(`ACT.fixInc({id:${inc}.id});compute()`);
   assert.equal(ev("S.links.filter(l=>l.kind==='wave').some(l=>linkDown(l))"), false, 'escalating brings them back');
+  assert.deepEqual(errors, []);
+});
+
+test('decommissioning POPs, one or several, removes what is there and charges for the customers', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  ev("for(const c of ['ams','par','lon'])ACT.buildPop({city:c});const L=(a,b)=>{UI.via=null;openLinkModal(a,b);ACT.buildLink({tier:1});closeModal();};L('fra','ams');L('fra','par');L('ams','lon');ACT.buyTransit({city:'ams',net:'cog',tier:1});ACT.buyIx({city:'ams',tier:1});ACT.peerAll({city:'ams'});compute()");
+  ev("S.biz.push({id:'b1',type:'l2vpn',name:'Tulip Bank',city:'ams',city2:'fra',bw:10,rate:300,reqs:[],mood:100,start:S.day},{id:'b2',type:'l2vpn',name:'Croissant Co',city:'par',city2:'fra',bw:5,rate:200,reqs:[],mood:100,start:S.day})");
+  ev("selectCity('ams');ACT.tab({t:'infra'})");
+  assert.match(ev("document.getElementById('panelBody').textContent"), /Decommission/);
+  ev("ACT.decomOpen({city:'ams'})");
+  assert.match(ev("document.getElementById('modalCard').textContent"), /Tulip Bank/);
+  const cash = ev('S.cash');
+  ev("ACT.decomToggle({city:'lon'});ACT.decomGo();compute()");
+  assert.equal(ev("!!S.pops.ams||!!S.pops.lon"), false, 'both gone');
+  assert.equal(ev("S.links.some(l=>[l.a,l.b].some(c=>c==='ams'||c==='lon'))"), false);
+  assert.equal(ev("S.transit.length+Object.keys(S.ixp).length"), 0, 'ports and exchange go with them');
+  assert.equal(ev("S.biz.map(b=>b.id).join()"), 'b2', 'only the Amsterdam customer is let go');
+  assert.equal(cash - ev('S.cash'), 10 * 300 * 3, 'three months of the contract');
+  // never the last one
+  ev("ACT.decomOpen({});for(const c of Object.keys(S.pops))ACT.decomToggle({city:c});ACT.decomGo()");
+  assert.ok(ev("Object.keys(S.pops).length") >= 1);
+  assert.deepEqual(errors, []);
+});
+
+test('#19 parallel waves draw as one line, dark fiber can add parallel links, NLNOG Day exists', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'nyc'});ACT.buildPop({city:'lon'})");
+  ev("for(let i=0;i<4;i++){UI.via='grace';UI.route='same';openLinkModal('nyc','lon');ACT.buildLink({tier:1});closeModal();}compute()");
+  assert.equal(ev("S.links.length"), 4);
+  assert.equal(ev("linkGroups().length"), 1, 'four waves on one cable are one line');
+  assert.match(ev("groupLabel(linkGroups()[0],linkGroups()[0])"), /^4×/);
+  ev("S.links.push({id:'dfp',a:'fra',b:'lon',kind:'df',km:640,sys:'lite',ch:['zr4'],ready:0,mo:500,day:0,cut:0});ACT.selLink({id:'dfp'})");
+  assert.match(ev("document.getElementById('panelBody').textContent"), /Add parallel link/);
+  assert.ok(ev("CONFS.some(c=>c.n==='NLNOG Day'&&c.c==='ams')"));
+  ev("cam.z=0.4;draw(0);cam.z=2;draw(0)");
+  assert.deepEqual(errors, []);
+});
+
+test('#40 overland between continents costs ten times subsea or more, and has no dark fiber', () => {
+  const { ev, errors } = load();
+  base(ev);
+  const r = JSON.parse(ev(`JSON.stringify(CABLE_PAIRS.filter(c=>landX(c.a,c.b)).map(c=>{
+    const land=waveMo(kmBetween(c.a,c.b),false,2)*landMult(c.a,c.b)*waveMarket(c.a,c.b,false).m;
+    const sub=waveMo(c.km,true,2)*CAB[c.cid].price*waveMarket(c.a,c.b,true).m;return land/sub;}))`));
+  assert.ok(r.length >= 4, 'Europe–Asia cable routes exist to compare');
+  for (const x of r) assert.ok(x >= 10, `overland is at least 10× subsea (${x.toFixed(1)})`);
+  assert.equal(ev("landX('mrs','hkg')"), true);
+  assert.equal(ev("landX('fra','mrs')"), false, 'inside Europe stays normal');
+  assert.equal(ev("landMult('fra','mrs')"), 1);
+  assert.equal(ev("dfAllowed('ist','dxb')"), false, 'no dark fiber pair across a dozen borders');
+  assert.equal(ev("dfAllowed('fra','mrs')"), true);
+  assert.deepEqual(errors, []);
+});
+
+test('#39 caches are limited by router ports, not by a fixed count', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("for(let i=0;i<5;i++){R.demTo.nfx=1e4;ACT.cache({city:'fra',net:'nfx'});}");
+  assert.equal(ev("S.caches.filter(x=>x.city==='fra'&&x.net==='nfx').length"), 5, 'a fifth box is fine');
+  // fill every remaining port: the next box is refused
+  ev("const p=S.pops.fra;while(portsUsed('fra')<portsMax('fra'))S.caches.push({id:uid(),city:'fra',net:'nfx'});window.__n=S.caches.length;R.demTo.nfx=1e4;ACT.cache({city:'fra',net:'nfx'})");
+  assert.equal(ev("S.caches.length"), ev("window.__n"), 'no free port, no box');
+  assert.deepEqual(errors, []);
+});
+
+test('#31 #33 #38 connections overview lists every port, filters it and jumps to it', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  const doc = dom.window.document;
+  ev("ACT.buildPop({city:'ams'});S.pops.fra.rgen=S.pops.ams.rgen=RG.length-1;S.pops.ams.bb={d:200};compute()");
+  ev("ACT.buyTransit({city:'fra',net:'cog',tier:1});ACT.buyTransit({city:'ams',net:'lvl',tier:1});ACT.buyIx({city:'ams~3',tier:1});ACT.buyIx({city:'ams',tier:1});compute()");
+  ev("S.pni.push({id:uid(),city:'fra',net:'ggl',tier:1});R.demTo.nfx=1e4;ACT.cache({city:'fra',net:'nfx'});R.demTo.nfx=1e4;ACT.cache({city:'fra',net:'nfx'});compute()");
+  const all = JSON.parse(ev('JSON.stringify(conns())'));
+  const by = (k) => all.filter((r) => r.k === k);
+  assert.equal(by('t').length, 2);
+  assert.equal(by('ix').length, 2);
+  assert.equal(by('p').length, 1);
+  assert.equal(by('c').length, 1, 'cache boxes of one CDN in one city are one row');
+  assert.match(by('c')[0].port, /2 boxes/);
+  // the listed prices add up to what the month actually costs
+  const sum = (k) => by(k).reduce((a, r) => a + r.mo, 0);
+  assert.ok(Math.abs(sum('t') - ev('R.cost.transit')) < 0.01, 'transit');
+  assert.ok(Math.abs(sum('ix') - ev('R.cost.ix')) < 0.01, 'IX');
+  assert.ok(Math.abs(sum('p') - ev('R.cost.pni')) < 0.01, 'PNI');
+  assert.equal(sum('c'), ev('R.cost.caches'));
+  // the dashboard section, with filters
+  ev("ACT.connOpen()");
+  const rows = () => doc.querySelectorAll('#connSec tbody tr').length;
+  assert.equal(rows(), all.length);
+  ev("ACT.connF({f:'k',v:'t'})");
+  assert.equal(rows(), 2, 'transit only (#38)');
+  const sel = doc.querySelector('#connSec select[data-chg="connCity"]');
+  sel.value = 'ams'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert.equal(rows(), 1, 'transit in Amsterdam');
+  assert.match(doc.querySelector('#connSec tbody').textContent, /Amsterdam/);
+  ev("ACT.connF({f:'all'})");
+  ev("ACT.connNet({v:'ggl'})");
+  assert.ok(rows() >= 1, 'a network filter finds its PNI and the exchanges it peers at');
+  assert.ok([...doc.querySelectorAll('#connSec tbody tr')].every((tr) => /Goggle|IX/.test(tr.textContent)));
+  ev("ACT.connCity({v:'nope'});ACT.connNet({v:'nope'});ACT.connF({f:'k',v:'nope'})");
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(UI.cf)')), { k: '', city: '', net: '' }, 'bad filter values are ignored');
+  // Open closes the dashboard and goes to the right tab of that POP
+  ev("ACT.goConn({city:'ams',k:'t'})");
+  assert.equal(ev("$('dash').hidden"), true);
+  assert.equal(ev('UI.sel.id'), 'ams');
+  assert.equal(ev('UI.tab'), 'up');
+  ev("ACT.goConn({city:'fra',k:'c'})");
+  assert.equal(ev('UI.tab'), 'peer');
+  // the Networks tab says where each network is connected (#33)
+  ev("UI.left='nets';UI.leftOpen=true;renderLeft()");
+  const cog = [...doc.querySelectorAll('#leftBody .row')].find((r) => /Cogentle/.test(r.textContent));
+  const jump = cog.querySelector('[data-act="goConn"]');
+  assert.ok(jump, 'Cogentle shows a jump button');
+  assert.match(jump.textContent, /Transit.*Frankfurt/);
+  assert.deepEqual(errors, []);
+});
+
+test('#13 #15 unhappy customers warn early, furious ones pause the game (optional)', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("S.biz.push({id:'b1',city:'fra',city2:null,reqs:[],name:'Llama Logistics',type:'dia',bw:5,rate:100,mood:100,since:-100});compute();ACT.speed({v:4})");
+  const toasts = () => ev("document.getElementById('toasts').textContent");
+  // service collapses: happiness falls through 60% (warning) then 30% (furious, paused)
+  ev("bizSf=()=>0.6");
+  for (let i = 0; i < 3; i++) ev('dayTick()');
+  assert.match(toasts(), /Llama Logistics is getting unhappy/);
+  assert.match(toasts(), /getting only 60%/, 'the warning says why');
+  assert.equal(ev('UI.speed'), 4, 'a warning does not pause');
+  for (let i = 0; i < 4 && ev('UI.speed') !== 0; i++) ev('dayTick()');
+  assert.match(toasts(), /Llama Logistics is furious/);
+  assert.equal(ev('UI.speed'), 0, 'furious pauses the game');
+  assert.match(toasts(), /Game paused/);
+  assert.equal(ev('UI.resumeSpeed'), 4, 'Resume goes back to the old speed');
+  // the setting turns it off
+  ev("setPref('pauseFurious',false);setPref('warnUnhappy',false);S.biz.push({id:'b2',city:'fra',city2:null,reqs:[],name:'Snack Overflow',type:'dia',bw:5,rate:100,mood:100,since:-100});ACT.speed({v:2})");
+  for (let i = 0; i < 5; i++) ev('dayTick()');
+  assert.ok(ev("S.biz.find(b=>b.id==='b2').mood") < 30);
+  assert.equal(ev('UI.speed'), 2, 'no pause with the setting off');
+  assert.doesNotMatch(toasts(), /Snack Overflow is getting unhappy/);
+  assert.equal(ev("JSON.parse(localStorage.getItem('sot-prefs')).pauseFurious"), false, 'stored per device');
+  assert.deepEqual(errors, []);
+});
+
+test('#14 customers overview lists everyone with happiness, reasons and a jump', () => {
+  const { ev, dom, errors } = load();
+  base(ev);
+  const doc = dom.window.document;
+  ev("ACT.buildPop({city:'ams'});S.biz.push({id:'c1',city:'fra',city2:null,reqs:[],name:'Happy Hamster',type:'dia',bw:10,rate:100,mood:95,since:-100},{id:'c2',city:'ams',city2:null,reqs:[],name:'Grumpy Goat',type:'host',bw:20,rate:100,mood:40,since:-100});compute();renderAll()");
+  const st = JSON.parse(ev('JSON.stringify(custStats())'));
+  assert.equal(st.n, 2);
+  assert.equal(st.unhappy, 1);
+  assert.equal(st.risk, 2000, 'the unhappy customer pays 2000/mo');
+  assert.ok(st.avg > 40 && st.avg < 95, 'happiness is weighted by what they pay');
+  assert.equal(ev("$('hCust').hidden"), false, 'HUD shows customer happiness');
+  assert.match(ev("$('hCustVal').textContent"), /%/);
+  ev('ACT.custOpen({})');
+  const names = () => [...doc.querySelectorAll('#custSec .row .nm')].map((n) => n.textContent);
+  assert.equal(names().length, 2);
+  assert.match(names()[0], /Grumpy Goat/, 'unhappiest first');
+  ev("ACT.custF({v:'sad'})");
+  assert.equal(names().length, 1);
+  ev("ACT.custF({v:''});ACT.custCity({v:'fra'})");
+  assert.deepEqual(names().map((n) => n.split(' ')[0]), ['Happy']);
+  ev("ACT.custGo({id:'c2'})");
+  assert.equal(ev("$('dash').hidden"), true);
+  assert.equal(ev('UI.sel.id'), 'ams');
+  assert.equal(ev('UI.tab'), 'cust');
+  // the Deals tab summary
+  ev("UI.left='deals';UI.leftOpen=true;UI.sel=null;renderLeft()");
+  assert.match(doc.getElementById('leftBody').textContent, /1 unhappy customer/);
+  assert.deepEqual(errors, []);
+});
+
+test('settings screen holds every option and opens from the menu and the title screen', () => {
+  const { ev, errors } = load();
+  ev('showTitle();ACT.settings()');
+  const card = () => ev("document.getElementById('modalCard').textContent");
+  for (const t of [/Pause when a customer is furious/, /Warn when a customer gets unhappy/, /Pause on outages/, /Animations/, /Sound/, /Language/]) assert.match(card(), t);
+  ev("ACT.prefSet({v:'pauseIncident:1'})");
+  assert.equal(ev("pref('pauseIncident')"), true);
+  ev("ACT.prefSet({v:'nope:1'})");
+  assert.equal(ev("'nope' in PREFS"), false, 'unknown settings are ignored');
+  ev('ACT.settingsClose()');
+  assert.match(card(), /Start building|Name your network/, 'back to the title screen');
+  ev('ACT.start({});ACT.menu();ACT.settings();ACT.settingsClose()');
+  assert.equal(ev("document.getElementById('modal').hidden"), true);
+  assert.deepEqual(errors, []);
+});
+
+test('#42 the share card draws links across the date line on both edges of the map', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("S.links.push({id:'x1',a:'tok',b:'sea',kind:'wave',tier:0,km:7700,mult:1,mo:0},{id:'x2',a:'sea',b:'tok',kind:'wave',tier:0,km:7700,mult:1,mo:0},{id:'x3',a:'fra',b:'ams',kind:'wave',tier:0,km:400,mult:1,mo:0})");
+  const segs = JSON.parse(ev('JSON.stringify(linkSegs())'));
+  assert.equal(segs.length, 5, 'two segments for each date-line link, one for the short one');
+  for (const id of ['x1', 'x2']) {
+    const mine = JSON.parse(ev(`JSON.stringify((()=>{S.links=S.links.filter(l=>l.id==='${id}');return linkSegs();})())`));
+    ev("S.links=[]");
+    assert.ok(mine.some(([a, , b]) => Math.min(a, b) < 0), `${id} reaches past the left edge`);
+    assert.ok(mine.some(([a, , b]) => Math.max(a, b) > ev('W')), `${id} reaches past the right edge`);
+    ev("S.links.push({id:'x1',a:'tok',b:'sea',kind:'wave',tier:0,km:7700,mult:1,mo:0},{id:'x2',a:'sea',b:'tok',kind:'wave',tier:0,km:7700,mult:1,mo:0})");
+  }
+  ev('shareCanvas()');
   assert.deepEqual(errors, []);
 });

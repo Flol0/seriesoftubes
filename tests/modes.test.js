@@ -106,6 +106,8 @@ test('the guided tutorial walks through the first steps and can be skipped', () 
 test('animations can be switched off, on or follow the system, and the choice sticks', () => {
   const { ev, errors } = load();
   ev("ACT.start({});ACT.menu()");
+  assert.match(ev("document.getElementById('modalCard').textContent"), /Settings/);
+  ev("ACT.settings()");
   assert.match(ev("document.getElementById('modalCard').textContent"), /Animations/);
   ev("ACT.animSet({v:'off'})");
   assert.equal(ev("document.documentElement.classList.contains('no-anim')"), true);
@@ -183,5 +185,111 @@ test('#27 new networks get a random name, and "Another one" never repeats it', (
   }
   ev("document.getElementById('nmIn').value='My Own Net';ACT.start({})");
   assert.equal(ev("S.name"), 'My Own Net');
+  assert.deepEqual(errors, []);
+});
+
+test('iPhone home-screen app fills the screen when iOS reports a short viewport', () => {
+  const { ev, dom, errors } = load();
+  const w = dom.window;
+  const set = (o, k, v) => Object.defineProperty(o, k, { value: v, configurable: true });
+  set(w.navigator, 'userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148');
+  set(w.navigator, 'standalone', true);
+  set(w, 'screen', { width: 390, height: 844 });
+  set(w, 'innerWidth', 390); set(w, 'innerHeight', 797);   // one status bar short
+  ev('resize()');
+  assert.equal(ev("document.documentElement.classList.contains('iosfix')"), true);
+  assert.equal(ev("document.documentElement.style.getPropertyValue('--app-h')"), '844px');
+  assert.equal(ev('CH'), 844, 'the map is drawn to the real bottom');
+  // landscape: the short side of the screen
+  set(w, 'innerWidth', 844); set(w, 'innerHeight', 370);
+  ev('resize()');
+  assert.equal(ev('CH'), 390);
+  // once fixed, iOS reports a full viewport: the fix must stay on, or the strip comes back
+  set(w, 'innerWidth', 390); set(w, 'innerHeight', 844);
+  ev('resize()');
+  assert.equal(ev("document.documentElement.classList.contains('iosfix')"), true);
+  assert.equal(ev('CH'), 844);
+  // Safari in a tab leaves the page alone
+  set(w.navigator, 'standalone', false); set(w, 'innerHeight', 700);
+  ev('resize()');
+  assert.equal(ev("document.documentElement.classList.contains('iosfix')"), false);
+  assert.equal(ev('CH'), 700);
+  assert.deepEqual(errors, []);
+});
+
+test('phones in the browser get the install pitch before a new game, then can still play', () => {
+  const { ev, dom, errors } = load();
+  const w = dom.window;
+  const set = (o, k, v) => Object.defineProperty(o, k, { value: v, configurable: true });
+  set(w.navigator, 'userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1');
+  set(w, 'innerWidth', 390); set(w, 'innerHeight', 760);
+  ev('showTitle()');
+  assert.match(ev("document.getElementById('modal').textContent"), /Best played as an app/, 'title screen card');
+  ev('ACT.start({})');
+  const modal = () => ev("document.getElementById('modal').textContent");
+  assert.equal(ev('!!S&&UI.started'), false, 'the game waits for the pitch');
+  assert.match(modal(), /Play it as an app/);
+  assert.match(modal(), /does not carry over/, 'iPhone players learn to install first');
+  assert.match(modal(), /Add to Home Screen/);
+  ev('ACT.pitchSkip()');
+  assert.equal(ev('UI.started&&!!S.pops[S.home]'), true, 'playing in the browser still works');
+  // only once per session
+  ev('ACT.newgame();ACT.start({})');
+  assert.equal(ev('UI.started'), true);
+  assert.deepEqual(errors, []);
+});
+
+test('the installed app and desktop browsers start straight away', () => {
+  for (const [w0, sa] of [[390, true], [1280, false]]) {
+    const { ev, dom, errors } = load();
+    const w = dom.window;
+    const set = (o, k, v) => Object.defineProperty(o, k, { value: v, configurable: true });
+    set(w.navigator, 'userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15');
+    set(w.navigator, 'standalone', sa);
+    set(w, 'innerWidth', w0); set(w, 'innerHeight', 760);
+    ev('ACT.start({})');
+    assert.equal(ev('UI.started'), true, `width ${w0}, standalone ${sa}`);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('#34 scenario goal, progress and customer level are always in view', () => {
+  const { ev, dom, errors } = load();
+  ev("ACT.startScn({id:'darien',sure:1})");
+  ev("UI.left='goals';UI.leftOpen=true;UI.sel=null;renderAll()");
+  const left = () => dom.window.document.getElementById('leftBody').textContent;
+  assert.match(left(), /Mind the Gap/);
+  assert.match(left(), /POP in Bogotá/);
+  assert.match(left(), /days left/);
+  assert.match(left(), /Customer level 1 of 4/);
+  assert.equal(ev("$('hScn').hidden"), false, 'scenario chip in the top bar');
+  const f0 = ev('scnProg().f');
+  ev("S.cash=1e8;ACT.buildPop({city:'bog'});ACT.buildPop({city:'lim'});compute();renderAll()");
+  assert.ok(ev('scnProg().f') > f0, 'progress moves when a goal step is reached');
+  assert.match(ev("$('hScnVal').textContent"), /%/);
+  assert.match(ev("$('hTier').textContent"), /Lv 1/);
+  // every scenario has measurable progress
+  for (const id of JSON.parse(ev("JSON.stringify(SCN.filter(s=>s.ok).map(s=>s.id))"))) {
+    ev(`ACT.startScn({id:'${id}',sure:1})`);
+    const P = JSON.parse(ev('JSON.stringify(scnProg())'));
+    assert.ok(P && P.items.length > 0, `${id} shows progress`);
+  }
+  ev('ACT.startWeekly({sure:1})');
+  assert.match(ev('scnCard()'), /score/);
+  assert.deepEqual(errors, []);
+});
+
+test('NOC dashboard has a tab bar for its sections', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});ACT.dash()");
+  const card = () => ev("document.getElementById('dashCard').textContent");
+  assert.match(card(), /Traffic by way out/);
+  assert.doesNotMatch(card(), /Busiest links/);
+  for (const [k, re] of [['cust', /Customers/], ['conn', /Every port that connects/], ['traffic', /Traffic by network/], ['infra', /Busiest links/]]) {
+    ev(`ACT.dashTab({k:'${k}'})`);
+    assert.match(card(), re, k);
+  }
+  ev("ACT.dashTab({k:'nope'})");
+  assert.equal(ev('UI.dtab'), 'infra', 'unknown tabs are ignored');
   assert.deepEqual(errors, []);
 });
