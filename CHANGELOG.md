@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+- Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport.
+
 ## [1.23.0] — 2026-10-25
 
 - Fixed: on a phone, a first-time player could not get past the "Play it as an

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Series of Tubes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
@@ -3401,12 +3401,14 @@ const cam={x:1050,y:330,z:0.8};
 let CW=0,CH=0,DPR=1;
 /* Installed on an iPhone home screen with a translucent status bar, iOS can report a viewport one status bar
    shorter than the screen while drawing from the very top, leaving an empty strip under the tab bar.
-   Measure the screen instead, on standalone iPhones only. It must not depend on the gap it fixes: once
+   Measure the screen instead, on standalone iPhones using black-translucent only.
+   The default status bar already reserves that space; stretching it would push the tab bar off screen. It must not depend on the gap it fixes: once
    the page is sized to the screen, iOS reports a full viewport, and switching back would bring the strip back. */
 function fixStandaloneHeight(){const R0=document.documentElement;
   const sa=window.navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
   const sh=screen&&screen.width&&screen.height?(innerWidth>innerHeight?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height)):0,gap=sh-innerHeight;
-  const on=sa&&/iPhone|iPod/.test(navigator.userAgent)&&sh>0&&gap>=0&&gap<=80;
+  const translucent=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content==='black-translucent';
+  const on=sa&&translucent&&/iPhone|iPod/.test(navigator.userAgent)&&sh>0&&gap>=0&&gap<=80;
   R0.classList.toggle('iosfix',on);if(on)R0.style.setProperty('--app-h',sh+'px');else R0.style.removeProperty('--app-h');return on?sh:0;}
 function resize(){const ah=fixStandaloneHeight();DPR=Math.min(2,window.devicePixelRatio||1);CW=innerWidth;CH=ah||innerHeight;cv.width=CW*DPR;cv.height=CH*DPR;}
 addEventListener('resize',()=>{resize();WL.key=null;renderLeft();fitHud();});resize();
