@@ -506,3 +506,17 @@ test('#79 Benelux: Brussels red tape, the Flanders duopoly, Oostkamp trawlers an
   assert.ok(ev("S.log.some(e=>/waste-wood/.test(e.t))"), 'the forestry strike');
   assert.deepEqual(errors, []);
 });
+
+test('Stuttgart sits between Frankfurt and Zurich, and Hamburg and Munich are on the map', () => {
+  const { ev, errors } = load();
+  const y = c => ev(`CITY.${c}.y`), x = c => ev(`CITY.${c}.x`);
+  assert.ok(y('fra') < y('stg') && y('stg') < y('zrh'), 'north to south: Frankfurt, Stuttgart, Zurich');
+  assert.ok(Math.abs(x('stg') - x('fra')) < 16, 'not pushed off towards Prague');
+  assert.ok(x('stg') < x('prg') - 20);
+  assert.ok(x('stg') < x('muc') && x('muc') < x('vie') && y('muc') > y('prg') && y('muc') < y('mil'), 'Munich: east of Stuttgart, west of Vienna, south of Prague');
+  assert.equal(ev("CITY.muc.ix"), 'Brezn-IX');
+  assert.ok(y('ham') < y('ber') && y('ham') < y('fra'), 'Hamburg is up north');
+  assert.equal(ev("CITY.ham.ix"), 'Moin-IX');
+  assert.equal(ev("NET.lvl.pops.includes('ham')&&NET.dtk.pops.includes('ham')"), true);
+  assert.deepEqual(errors, []);
+});

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.28.0-qol.2] — 2026-10-25
+
+- Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included.
+
 ## [1.28.0-qol.1] — 2026-10-25
 
 - Updated to upstream 1.28.0 with the new Benelux cities and networks, retaining all local QoL improvements.
@@ -23,6 +27,7 @@ All notable changes to this project are documented here. The project follows
 - Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
 
 
+- Hamburg and Munich join the map, with the Moin-IX and the Brezn-IX. Stuttgart and Frankfurt are back where they belong on the map, with Stuttgart between Frankfurt and Zurich instead of halfway to Prague.
 ## [1.28.0] — 2026-10-25
 
 - Belgium and Luxembourg join the map: Brussels, Oostkamp and Bettembourg (#79). Belgian POPs and transit cost more, and Belgian homes stay with their two big ISPs unless you run an ad campaign there. Telenyet, Proxyminus, B.I.G.S., Citrus Belgium and CityMess join the networks, a new cable connects London to Oostkamp through some very busy fishing grounds, and Bettembourg's cooling depends on a steady supply of waste wood.
