@@ -188,12 +188,13 @@ test('#27 new networks get a random name, and "Another one" never repeats it', (
   assert.deepEqual(errors, []);
 });
 
-test('iPhone home-screen app fills the screen when iOS reports a short viewport', () => {
+test('legacy translucent iPhone home-screen app fills a short viewport', () => {
   const { ev, dom, errors } = load();
   const w = dom.window;
   const set = (o, k, v) => Object.defineProperty(o, k, { value: v, configurable: true });
   set(w.navigator, 'userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148');
   set(w.navigator, 'standalone', true);
+  dom.window.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content='black-translucent';
   set(w, 'screen', { width: 390, height: 844 });
   set(w, 'innerWidth', 390); set(w, 'innerHeight', 797);   // one status bar short
   ev('resize()');
@@ -331,4 +332,16 @@ test('Flood Season: attacks keep coming, grow, and only count when service held'
   ev('S.stats.ddosOk=20;S.stats.ddosOkBig=5;scnTick(S.day)');
   assert.ok(ev('!!S.scn.done'), 'the goal completes');
   assert.deepEqual(errors, []);
+});
+
+test('opaque iOS status bar keeps the HUD below the system area without stretching the viewport',()=>{
+ const {ev,dom,errors}=load();const w=dom.window;
+ const set=(o,k,v)=>Object.defineProperty(o,k,{value:v,configurable:true});
+ assert.equal(dom.window.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content,'default');
+ set(w.navigator,'userAgent','Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15');
+ set(w.navigator,'standalone',true);set(w,'screen',{width:390,height:844});set(w,'innerWidth',390);set(w,'innerHeight',797);
+ ev("ACT.start({});resize();renderAll()");assert.equal(ev('CH'),797);assert.equal(ev("document.documentElement.classList.contains('iosfix')"),false);
+ assert.equal(ev("document.documentElement.style.getPropertyValue('--app-h')"),'');
+ set(w,'innerWidth',844);set(w,'innerHeight',370);ev('resize()');assert.equal(ev('CH'),370);
+ assert.deepEqual(errors,[]);
 });

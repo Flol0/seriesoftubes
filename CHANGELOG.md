@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+- Installed iOS apps keep the game toolbar clear from startup: use a normal status bar and a solid top edge, without stretching the bottom navigation past the viewport.
+
 ## [1.25.0] — 2026-10-25
 
 - Your own trench can carry more than one fiber pair (#35). Once a ROADMaster
