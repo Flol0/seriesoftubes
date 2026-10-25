@@ -1,8 +1,8 @@
 /* Series of Tubes service worker: makes the game installable and playable offline.
    The page always comes from the network when there is one, so a new release shows up on the
    next visit; everything else is served from the cache and refreshed in the background. */
-const CACHE = 'sot-1.27.0-qol.2';
-const CORE = ['/', '/index.html', '/site.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/i18n/it.js?v=1.27.0-qol.2'];
+const CACHE = 'sot-1.28.0-qol.1';
+const CORE = ['/', '/index.html', '/site.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/i18n/it.js?v=1.28.0-qol.1'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
