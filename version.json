@@ -1,7 +1,8 @@
 {
-  "version": "1.25.2-qol.1",
+  "version": "1.27.0-qol.1",
   "date": "2026-10-25",
   "notes": [
-    "Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace."
+    "Updated to upstream 1.27.0, including the mobile NOC navigation fix, while retaining the local PNI finder, own-IX uplinks, PWA display fix, link redundancy checks and network reach filters.",
+    "Opening a link from the NOC on mobile now closes the NOC sheet so the link details are visible."
   ]
 }
