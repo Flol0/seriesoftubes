@@ -608,3 +608,23 @@ test('#20 local PNIs satisfy local breakout only while Tier 1, without changing 
  ev("S.transit=[];S.ixp.fra=0");assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
  assert.deepEqual(errors,[]);
 });
+
+test('#36 own IX uplinks use ports, split across sites and stay within fabric capacity',()=>{
+ const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.lvl=4;ACT.buildPop({city:'mex'});ACT.foundIx({city:'mex'});ACT.addSite({city:'mex'});compute()");
+ const cap=ev("ixCap('mex')"),ports=ev("portsUsed('mex')"),mo=ev("ixMo('mex')"),cash=ev('S.cash');
+ ev("ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
+ assert.equal(ev('S.ixn.mex'),2);assert.equal(ev('S.ixSite.mex'),'ab');
+ assert.equal(ev("portsUsed('mex')"),ports+1);assert.equal(ev('S.cash'),cash-ev('PORT[S.ixp.mex].setup'));
+ assert.equal(ev("ixMo('mex')"),mo);assert.equal(ev("ixCap('mex')"),cap,'extra uplinks do not invent switching capacity');
+ for(const site of ['a','b']){ev(`S.inc=[{type:'site',ref:'mex',site:'${site}',until:S.day+10}];compute()`);assert.equal(ev("ixCap('mex')"),cap);}
+ ev("ACT.siteSet({k:'ix',id:'mex',s:'b'});S.inc=[{type:'site',ref:'mex',site:'b',until:S.day+10}];compute()");assert.equal(ev("ixCap('mex')"),0);
+ ev("S.inc=[];ACT.siteSet({k:'ix',id:'mex',s:'ab'});ACT.lagIx({city:'mex',d:-1})");assert.equal(ev('S.ixn.mex'),1);assert.equal(ev('S.ixSite.mex'),'a');assert.equal(ev("portsUsed('mex')"),ports);
+ ev("S=migrate(JSON.parse(JSON.stringify(S)));compute();ACT.focusCity({city:'mex'});UI.tab='peer';renderPanel()");
+ assert.match(ev("$('panelBody').textContent"),/Router uplinks/);assert.equal(ev("ixCap('mex')"),cap);
+ ev("delete S.ixn.mex;delete S.ixSite.mex;S=migrate(JSON.parse(JSON.stringify(S)));compute()");assert.equal(ev("ixCap('mex')"),cap,'legacy own IX keeps its capacity');
+ ev("S.pops.mex.rgen=0;S.pops.mex.routers=1;S.pni=Array.from({length:7},(_,i)=>({id:'p'+i,net:'cog',city:'mex',tier:1}));window.before=S.cash;ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
+ assert.equal(ev('S.cash'),ev('before'));assert.equal(ev('S.ixn.mex||1'),1);assert.notEqual(ev('S.ixSite.mex'),'ab');
+ ev("S.pni=[];S.cash=0;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex||1'),1);
+ ev("S.cash=1e8;S.ixn.mex=LAG_MAX;window.before=S.cash;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex'),ev('LAG_MAX'));assert.equal(ev('S.cash'),ev('before'));
+ assert.deepEqual(errors,[]);
+});
