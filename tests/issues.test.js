@@ -1084,3 +1084,36 @@ test('#63 incidents you can fix with one click sit above hot ports in the NOC', 
   assert.ok(t.indexOf('DDoS scrubbing') > fix, 'status lines come after the incidents');
   assert.deepEqual(errors, []);
 });
+
+test('#82 router swaps trade in the old gear, one swap a day, and requirements name the speed', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});S.pops.fra.rgen=1;S.pops.fra.routers=2");
+  const c0 = ev('S.cash'), back = ev('tradeIn(1,2)');
+  assert.equal(back, Math.round(ev('RG[1].cost') * 2 * 0.3));
+  ev("ACT.upRouter({city:'fra',g:2})");
+  assert.equal(ev('S.pops.fra.rgen'), 2);
+  assert.equal(c0 - ev('S.cash'), ev('RG[2].cost') * 2 - back, 'you pay the new routers minus the old ones sold on eBuy');
+  // a double click does not chain a second upgrade
+  ev("ACT.upRouter({city:'fra',g:3})");
+  assert.equal(ev('S.pops.fra.rgen'), 2, 'one swap a day');
+  ev("S.day++;ACT.upRouter({city:'fra',g:3})");
+  assert.equal(ev('S.pops.fra.rgen'), 3);
+  // removing a router sells it too
+  const c1 = ev('S.cash');
+  ev("ACT.rmRouter({city:'fra'})");
+  assert.equal(ev('S.cash') - c1, ev('tradeIn(3,1)'));
+  // requirements say the speed, not one model
+  ev("ACT.buildPop({city:'ams'});S.pops.ams.rgen=0;S.links.push({id:'df',a:'fra',b:'ams',kind:'df',km:450,sys:'roadm',ch:[],ready:0,mo:1,day:0,cut:0});compute()");
+  assert.match(ev("chWhy(S.links.find(l=>l.id==='df'),'tp16')"), /routers with 800G ports or bigger/);
+  assert.equal(ev('waveNeed(4)'), '1.6T routers');
+  assert.deepEqual(errors, []);
+});
+
+test('fiber between nearby cities bends gently instead of looping around the neighbourhood', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;for(const g of GOALS)S.done[g.id]=0;for(const x of ['tor','ott','mtl','nyc','ash'])if(!S.pops[x])ACT.buildPop({city:x})");
+  ev("const L=(a,b)=>{UI.via=null;UI.lmode='wave';UI.route='diverse';openLinkModal(a,b);ACT.buildLink({tier:1});closeModal();};L('tor','ott');L('ott','mtl');L('tor','nyc');L('tor','mtl');L('mtl','nyc');L('tor','ash');L('ash','nyc');GEO.clear()");
+  const worst = ev("Math.max(...S.links.map(l=>{const g=linkGeom(l),A=CITY[l.a],B=CITY[l.b],L=Math.hypot(B.x-A.x,B.y-A.y);return Math.max(...g.pts.map(p=>segDist(p[0],p[1],[A.x,A.y],[B.x,B.y])))/L;}))");
+  assert.ok(worst < 0.3, `worst bend is ${worst.toFixed(2)}× its length`);
+  assert.deepEqual(errors, []);
+});
