@@ -435,3 +435,43 @@ test('#22 Tier 1 networks can lay their own subsea cable', () => {
   assert.match(ev("ownCabWhy('sha','sea')"), /China/);
   assert.deepEqual(errors, []);
 });
+
+test('#76 Kansas City, Calgary, Vancouver and Ottawa, with two more Canadian giants and their beavers', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  for (const c of ['kcy', 'cal', 'van', 'ott']) {
+    assert.equal(ev(`CITY.${c}.land`), 'am');
+    assert.ok(ev(`CITY.${c}.ix.length>0&&CITY.${c}.dc.length>0`), `${c} has an IX and a data center`);
+  }
+  assert.equal(ev('CITY.ott.blackout'), true, 'Ottawa gets frequent power cuts');
+  assert.equal(ev("['tor','mtl','cal','van','ott'].every(c=>CITY[c].ca)&&!CITY.kcy.ca"), true);
+  // Canadian eyeballs come through the Tier 1s they buy transit from, so a Tier 1 keeps its reach
+  ev("S.transit=[];S.ixp={};S.pni=[];for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:'fra',tier:0});compute()");
+  assert.equal(ev("t1Need().every(n=>n.pops.includes('fra'))"), true);
+  assert.equal(ev("R.reachable.tlu&&R.reachable.rgc"), true, 'reachable over PNIs with their upstream Tier 1s');
+  assert.equal(ev("NET.tlu.up.every(id=>NET[id].type==='t1')&&NET.rgc.up.every(id=>NET[id].type==='t1')"), true);
+  // a cut on a Canadian link is often a beaver
+  ev("ACT.buildPop({city:'van'});ACT.buildPop({city:'cal'});S.links=[];UI.via=null;openLinkModal('van','cal');ACT.buildLink({tier:1});closeModal()");
+  const src = ev('fireFailure.toString()').replace(/^function fireFailure/, 'function');
+  ev('window.__ff=' + src.replace('type=pick(f);}', "type='cut';}"));
+  ev("for(let i=0;i<40&&!(S.stats.f&&S.stats.f.beaver);i++){for(const l of S.links)l.cut=0;S.inc=[];__ff();}");
+  assert.ok(ev("!!(S.stats.f&&S.stats.f.beaver)"), 'a beaver chewed through it');
+  ev('checkBadges()');
+  assert.ok(ev("(S.badges||[]).includes('beaver')||!!(S.badge&&S.badge.beaver)||BADGES.find(b=>b.id==='beaver').ok()"), 'Dam It');
+  assert.deepEqual(errors, []);
+});
+
+test('#70 Goggle throttling in Russia no longer counts as traffic you failed to deliver', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'mos'});ACT.launchBB({city:'mos'})");
+  ev("S.pops.fra.rgen=S.pops.mos.rgen=3;S.pops.fra.routers=S.pops.mos.routers=3;ACT.buyTransit({city:'fra',net:'cog',tier:4});ACT.lagT({id:S.transit[0].id,d:1});UI.via=null;UI.lmode='wave';openLinkModal('fra','mos');ACT.buildLink({tier:4});closeModal();S.pops.mos.bb.d=300;compute()");
+  assert.equal(ev('S.links.length'), 1);
+  assert.ok(ev("sfOf(R,'mos')") > 0.99, `Moscow is fully served (${ev("sfOf(R,'mos')")})`);
+  // demand toward Goggle is half of what it would be without the throttle
+  const g = ev("NSH_RU.ggl"), d0 = ev("R.cityEye.mos");
+  assert.ok(Math.abs(ev("R.cityDem.mos") - d0 * (1 - g / 2)) < 1e-6);
+  // a game-server customer judged on the city's service stays happy
+  ev("S.biz.push({id:'gs',name:'Startup #384',type:'game',city:'mos',bw:5,rate:120,reqs:[],mood:0.5,day:0});compute()");
+  assert.equal(ev("bizWhy(S.biz.find(b=>b.id==='gs')).length"), 0, 'no complaint about bandwidth');
+  assert.deepEqual(errors, []);
+});

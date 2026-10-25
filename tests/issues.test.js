@@ -997,3 +997,90 @@ test('opening a link on desktop keeps the NOC sidebar available', () => {
   assert.deepEqual(errors, []);
   dom.window.close();
 });
+
+test('#77 waves can join any route already dug between two cities', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'ams'})");
+  const add = r => ev(`UI.via=null;UI.lmode='wave';UI.route=${JSON.stringify(r)};openLinkModal('fra','ams');ACT.buildLink({tier:1});closeModal()`);
+  add('diverse');                                   // first wave: the main route
+  add('diverse');                                   // second: a diverse route
+  const ts = () => JSON.parse(ev("JSON.stringify(landTrenches('fra','ams').map(t=>[t.k,t.n]))"));
+  assert.equal(ts().length, 2);
+  const [main, div] = ts().map(t => t[0]);
+  // the old two-way choice still works, and two routes now show a button each
+  ev("UI.route='diverse';openLinkModal('fra','ams')");
+  assert.equal(ev("document.querySelectorAll('#modalCard [data-act=route]').length"), 3, 'main, diverse 1 and a new one');
+  ev("closeModal()");
+  add('t:' + main);                                 // third: on the main route
+  add('t:' + div);                                  // fourth: on the diverse route
+  assert.deepEqual(ts().map(t => t[1]), [2, 2], 'two waves on each route');
+  // prices follow the route: the main route at list price, a diverse one at +40%
+  const w = id => ev(`S.links.filter(l=>l.kind==='wave').map(l=>l.mult)[${id}]`);
+  assert.ok(Math.abs(w(2) - w(0)) < 1e-9, 'joining the main route costs like the main route');
+  assert.ok(Math.abs(w(3) - w(1)) < 1e-9, 'joining the diverse route costs like the diverse route');
+  assert.ok(w(1) > w(0) * 1.3);
+  // a route id from another pair falls back to a new diverse route
+  add('t:nonsense');
+  assert.equal(ts().length, 3);
+  assert.deepEqual(errors, []);
+});
+
+test('#73 losing Tier 1 to a sliver of reach is visible and explained', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;S.transit=[];S.ixp={};S.pni=[];for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:n.pops[0],tier:0});S.won=true");
+  // everything reachable except one small network: 99.6%, which used to show as 100%
+  const small = ev("NETS.filter(n=>NSH[n.id]>0.002&&NSH[n.id]<0.006)[0].id");
+  ev(`R.reach=1-NSH['${small}'];for(const n of NETS)R.reachable[n.id]=n.id!=='${small}';renderHUD()`);
+  assert.ok(ev('R.reach') < 0.999 && ev('R.reach') > 0.99);
+  assert.equal(ev('isTier1()'), false);
+  assert.notEqual(ev("$('hReach').textContent"), '100%', 'the top bar does not round it up');
+  assert.match(ev("$('hReach').textContent"), /^99\.\d%$/);
+  assert.match(ev('t1Why()'), new RegExp('cannot reach ' + ev(`NET['${small}'].name`)));
+  ev("UI.left='goals';UI.leftOpen=true;UI.sel=null;renderLeft()");
+  assert.match(ev("document.getElementById('leftBody').textContent"), /Not Tier 1 right now: you cannot reach/);
+  ev("R.reach=1;for(const n of NETS)R.reachable[n.id]=true;renderHUD();renderLeft()");
+  assert.equal(ev("$('hReach').textContent"), '100%');
+  assert.equal(ev('isTier1()'), true);
+  assert.doesNotMatch(ev("document.getElementById('leftBody').textContent"), /Not Tier 1 right now/);
+  assert.deepEqual(errors, []);
+});
+
+test('#69 embedded caches can sit in either metro building, so one dark building leaves the rest serving', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.addSite({city:'fra'});R.demTo.nfx=500");
+  ev("ACT.cache({city:'fra',net:'nfx'});R.demTo.nfx=500;ACT.cache({city:'fra',net:'nfx'})");
+  assert.equal(ev("S.caches.map(x=>x.site).sort().join()"), 'a,b', 'the second box goes to the other building by itself');
+  ev("ACT.cacheSite({city:'fra',net:'nfx',s:'a'})");
+  assert.equal(ev("S.caches.filter(x=>x.site==='a').length"), 2);
+  ev("ACT.cacheSite({city:'fra',net:'nfx',s:'b'})");
+  assert.equal(ev("S.caches.filter(x=>x.site==='b').length"), 1);
+  // building A goes dark: only the box in B keeps serving
+  ev("S.inc=[{type:'site',ref:'fra',site:'a',until:S.day+5}];compute()");
+  const up = () => ev("(()=>{let n=0;for(const x of S.caches)if(!siteDown('fra',x.site==='b'?'b':'a'))n++;return n;})()");
+  assert.equal(up(), 1);
+  assert.equal(ev("R.useCache[S.caches.find(x=>x.site==='a').id]||0"), 0, 'the box in the dark building carries nothing');
+  assert.ok(ev("R.useCache[S.caches.find(x=>x.site==='b').id]||0") > 0, 'the box in B still serves');
+  ev("UI.sel={type:'city',id:'fra'};UI.tab='peer';renderPanel()");
+  assert.match(ev("$('panelBody').textContent"), /Boxes: 1 in A · 1 in B/);
+  // old saves: caches without a site are in A; dropping the second site moves them back
+  ev("delete S.caches[0].site;S=migrate(JSON.parse(JSON.stringify(S)))");
+  assert.ok(ev("S.caches.every(x=>x.site==='a'||x.site==='b')"));
+  ev("S.inc=[];ACT.rmSite({city:'fra'});ACT.rmSite({city:'fra'})");
+  assert.equal(ev("S.caches.every(x=>x.site==='a')"), true);
+  assert.deepEqual(errors, []);
+});
+
+test('#63 incidents you can fix with one click sit above hot ports in the NOC', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buyTransit({city:'fra',net:'cog',tier:0});compute()");
+  ev("R.useT[S.transit[0].id]=10;window.hotPorts=()=>[{k:'t',city:'fra',lab:'Cogentle transit',u:0.97,tip:'Upgrade it.'}]");
+  ev("S.inc.push({id:'x1',type:'loss',ref:'l',until:S.day+5,msg:'Free one',start:S.day},{id:'x2',type:'optic',ref:'l',until:S.day+9,msg:'A transceiver died.',cost:7000,fix:'Replace the optic',start:S.day})");
+  ev("UI.left='noc';UI.leftOpen=true;UI.sel=null;renderLeft()");
+  const t = ev("document.getElementById('leftBody').textContent");
+  const fix = t.indexOf('Replace the optic'), hot = t.indexOf('running hot'), free = t.indexOf('Free one');
+  assert.ok(fix >= 0 && hot >= 0 && free >= 0, 'all three are shown');
+  assert.ok(fix < hot, 'the paid fix comes before the hot ports');
+  assert.ok(fix < free, 'and before incidents without a fix');
+  assert.ok(t.indexOf('DDoS scrubbing') > fix, 'status lines come after the incidents');
+  assert.deepEqual(errors, []);
+});
