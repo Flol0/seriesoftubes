@@ -5,9 +5,10 @@ translations and code are all welcome.
 
 ## Reporting bugs and ideas
 
-Open an issue on GitHub. For bugs, include what you did, what you expected and what
-happened. If it involves a game in progress, attach an export of your save (menu →
-Export), which lets us load your exact network.
+Open an issue on GitHub and pick the form that fits: bug report, feature request,
+balance or realism, or translation. Blank issues are turned off so every report has
+what we need to triage it. For bugs, an export of your save (menu → Export save)
+lets us load your exact network. One topic per issue, please.
 
 Ideas are best when they say what happens in real networks and how that could become
 a fun mechanic.

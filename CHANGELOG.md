@@ -6,17 +6,26 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
-## [1.23.0-pwa.3] — 2026-10-25
+## [1.25.1] — 2026-10-25
 
-- Find PNI locations from the Networks list and NOC traffic table, with your POPs first and city shortcuts. The mobile tab bar remains accessible (#12).
+- Once you have half a billion in the bank, the banks stop sending loan offers
+  (#52). They come back if your cash drops below that again.
 
-## [1.23.0-pwa.2] — 2026-10-25
+## [1.25.0] — 2026-10-25
 
-- Installed apps paint a solid top edge from startup, without needing to open the bank first.
+- Your own trench can carry more than one fiber pair (#35). Once a ROADMaster
+  9000 has all 64 channels lit, light the next pair: another ROADMaster and
+  another chain of amplifiers for 64 more channels, up to four pairs.
 
-## [1.23.0-pwa.1] — 2026-10-25
+## [1.24.0] — 2026-10-25
 
-- Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport.
+- New scenario: Flood Season. Amsterdam in peak botnet season: a DDoS flood
+  every few days, a third of them in the terabits and growing all year, on
+  top of everything else that breaks. Hold 20 floods, 5 of them over 1 Tbps,
+  with the city under attack still getting 97% of its traffic. Expect smart
+  toasters, sentient fridges and one very determined printer.
+- Fixed: when a DDoS attack started while another was still running, the
+  first one ending could wipe out the new one early.
 
 ## [1.23.0] — 2026-10-25
 
@@ -569,3 +578,17 @@ First public release.
 - Dozens of failure types and geopolitical events, a NOC with an event log, and
   a NOC dashboard with traffic, money and per-ASN graphs.
 - Cookieless Ridiculytics analytics on the live site only.
+
+## Earlier local test builds
+
+### [1.23.0-pwa.3] — 2026-10-25
+
+- Find PNI locations from the Networks list and NOC traffic table, with your POPs first and city shortcuts. The mobile tab bar remains accessible (#12).
+
+### [1.23.0-pwa.2] — 2026-10-25
+
+- Installed apps paint a solid top edge from startup, without needing to open the bank first.
+
+### [1.23.0-pwa.1] — 2026-10-25
+
+- Installed iOS apps use an opaque system status bar so the game HUD stays below it, without stretching the bottom navigation past the viewport.

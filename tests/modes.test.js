@@ -312,6 +312,27 @@ test('a brand-new phone player can click through the install pitch and the title
   assert.deepEqual(errors, []);
 });
 
+test('Flood Season: attacks keep coming, grow, and only count when service held', () => {
+  const { ev, errors } = load();
+  ev("ACT.startScn({id:'flood',sure:1})");
+  assert.equal(ev("S.scn.id"), 'flood');
+  assert.ok(ev('S.lvl') >= 3, 'starts with bigger gear unlocked');
+  // a few weeks in: several attacks start on their own schedule
+  let n = 0;
+  for (let i = 0; i < 40; i++) { ev('dayTick()'); if (ev('!!(S.ev.ddos&&S.ev.ddos.start===S.day)')) n++; }
+  assert.ok(n >= 4, `attacks keep coming (${n} in 40 days)`);
+  assert.ok(ev('(S.stats.ddosOk||0)+(S.stats.ddosLost||0)') >= 3, 'finished attacks are scored');
+  // scoring: held only if service stayed at 97%+
+  ev("S.stats.ddosOk=0;S.stats.ddosOkBig=0;S.stats.ddosLost=0;ddosDone({city:'ams',gbps:1500,worst:0.99});ddosDone({city:'ams',gbps:20,worst:0.5});ddosDone({city:'xyz',gbps:30,worst:1})");
+  assert.equal(ev('S.stats.ddosOk'), 2);
+  assert.equal(ev('S.stats.ddosOkBig'), 1);
+  assert.equal(ev('S.stats.ddosLost'), 1);
+  const P = JSON.parse(ev('JSON.stringify(scnProg())'));
+  assert.match(P.items.map((x) => x.l).join(' '), /Floods held.*Terabit floods held/);
+  ev('S.stats.ddosOk=20;S.stats.ddosOkBig=5;scnTick(S.day)');
+  assert.ok(ev('!!S.scn.done'), 'the goal completes');
+  assert.deepEqual(errors, []);
+});
 
 test('opaque iOS status bar keeps the HUD below the system area without stretching the viewport',()=>{
  const {ev,dom,errors}=load();const w=dom.window;

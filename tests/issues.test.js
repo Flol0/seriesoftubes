@@ -516,6 +516,30 @@ test('#45 unplugged optics go on a spares shelf, get reused for free, or sold fo
   assert.deepEqual(errors, []);
 });
 
+test('#35 your own trench can light another fiber pair once a ROADMaster is full', () => {
+  const { ev, errors } = load();
+  base(ev);
+  ev("S.lvl=4;ACT.buildPop({city:'ams'});S.pops.fra.rgen=S.pops.ams.rgen=RG.length-1;S.pops.fra.routers=S.pops.ams.routers=RMAX;S.links.push({id:'own1',a:'fra',b:'ams',kind:'df',own:true,km:450,sys:'roadm',ch:[],ready:0,mo:500,day:0,cut:0});compute()");
+  assert.equal(ev("chMax(S.links[0])"), 64);
+  ev("ACT.addPair({id:'own1'})");
+  assert.equal(ev("S.links[0].pairs||1"), 1, 'not before the first pair is full');
+  ev("S.links[0].ch=Array(64).fill('zr4');compute()");
+  assert.match(ev("chWhy(S.links[0],'zr4')"), /full/);
+  const c0 = ev('S.cash'), mo0 = ev('R.cost.optical');
+  ev("ACT.addPair({id:'own1'})");
+  assert.equal(ev('S.links[0].pairs'), 2);
+  assert.equal(ev('chMax(S.links[0])'), 128);
+  assert.equal(c0 - ev('S.cash'), ev('pairCost(S.links[0])'), 'a ROADMaster plus a chain of amplifiers');
+  assert.ok(ev('R.cost.optical') > mo0, 'the new amplifier huts cost monthly');
+  assert.ok(!/full/.test(ev("chWhy(S.links[0],'zr4')")), 'room for more channels');
+  // leased fiber and the smaller line system stay at one pair
+  ev("S.links.push({id:'iru',a:'fra',b:'ams',kind:'df',own:false,km:450,sys:'roadm',ch:Array(64).fill('zr4'),ready:0,mo:500,day:0,cut:0});ACT.addPair({id:'iru'})");
+  assert.equal(ev("S.links[1].pairs||1"), 1);
+  ev("S.links[0].pairs=99;S=migrate(JSON.parse(JSON.stringify(S)))");
+  assert.equal(ev('S.links[0].pairs'), 4, 'saves are clamped to four pairs');
+  assert.deepEqual(errors, []);
+});
+
 test('#12 PNI discovery lists physical presence, marks own POPs and opens the city',()=>{
  const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.left='nets';renderAll();ACT.pniFind({net:'gog'})");
  const id=ev("NETS.find(n=>n.pops.length>6&&n.pops.includes('fra')).id");ev(`ACT.pniFind({net:'${id}'})`);
