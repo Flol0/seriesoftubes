@@ -1,7 +1,7 @@
 {
-  "version": "1.25.1-qol.1",
+  "version": "1.25.1-qol.2",
   "date": "2026-10-25",
   "notes": [
-    "A deal’s “Go there” button takes you to a required city without a POP, instead of returning to a city you already serve."
+    "Check a selected link’s redundancy against current demand: see disconnected endpoints, additional service loss and full fallback links without changing the live network."
   ]
 }
