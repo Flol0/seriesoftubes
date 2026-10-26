@@ -2812,9 +2812,9 @@ const ACT={
  leaseSwap:({a,b,src})=>{if(!S.pops[a]||!S.pops[b]||a===b)return;$('dash').hidden=true;UI.lmode='df';UI.dfSrc=['lease','build','cable'].includes(src)?src:isSub(a,b)?'cable':'build';UI.dfSys=lvl()>=3?'roadm':'lite';openLinkModal(a,b);},
  dashLink:({id})=>{$('dash').hidden=true;selectLink(id);},
  animSet:({v})=>{if(!['auto','on','off'].includes(v))return;UI.anim=v;try{localStorage.setItem('sot-anim',v);}catch(e){}applyAnim();refreshSettings();},
- soundSet:({v})=>{UI.muted=v==='off';try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();refreshSettings();},
+ soundSet:({v})=>{UI.muted=v==='off';if(!UI.muted){audioInit();sfx('click');}try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();refreshSettings();},
  langSet:({v})=>{if(!Object.hasOwn(LANGS,v)||v===LANG)return;try{localStorage.setItem('sot-lang',v);}catch(e){}save();location.reload();},
- mute:()=>{UI.muted=!UI.muted;try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();},
+ mute:()=>{UI.muted=!UI.muted;if(!UI.muted){audioInit();sfx('click');}try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();},
  closePanel:()=>{UI.sel=null;UI.confirm=null;renderPanel();renderLeft();},
  closeModal:()=>closeModal(),
  tab:({t})=>{UI.tab=t;UI.confirm=null;renderPanel();},
@@ -3095,7 +3095,10 @@ function loadSave(){try{const t=localStorage.getItem('sot-save-v1');if(t){const 
 
 /* ================= AUDIO ================= */
 let AC=null;
-function audioInit(){if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+function audioInit(){try{if(!AC||AC.state==='closed')AC=new (window.AudioContext||window.webkitAudioContext)();
+  // Browsers may suspend audio after a tab/app switch; retry on the next user gesture.
+  if(AC.state==='suspended'||AC.state==='interrupted'){const r=AC.resume();if(r&&r.catch)r.catch(()=>{});}
+}catch(e){}}
 function tone(f,t0,dur,type='square',vol=.05){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,AC.currentTime+t0);g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+t0+dur);o.connect(g).connect(AC.destination);o.start(AC.currentTime+t0);o.stop(AC.currentTime+t0+dur+.02);}
 function sfx(k){if(UI.muted||!AC)return;try{
   if(k==='coin'){tone(988,0,.08);tone(1319,.08,.18);}

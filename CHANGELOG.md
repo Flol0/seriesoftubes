@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.29.0-qol.3] — 2026-10-26
+
+- Sound resumes after browser or app interruptions on your next interaction. Turning sound on plays a short confirmation tone.
+
 ## [1.29.0-qol.2] — 2026-10-26
 
 - Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements.
