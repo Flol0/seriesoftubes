@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 
 
 def git(*args, check=True):
-    return subprocess.run(['git', *args], check=check, text=True, capture_output=True)
+    result = subprocess.run(['git', *args], text=True, capture_output=True)
+    if check and result.returncode:
+        raise SystemExit(result.stderr or result.stdout or f'git {args} failed')
+    return result
 
 
 def output(name, value):
@@ -32,7 +35,15 @@ merged = git('merge', '--no-commit', '--no-ff', upstream, check=False)
 if merged.returncode and git('rev-parse', '--verify', 'MERGE_HEAD', check=False).returncode:
     raise SystemExit(merged.stderr)
 # Upstream workflow changes must not replace the fork's automation or publishing settings.
-git('restore', '--source=HEAD', '--staged', '--worktree', '.github/workflows', 'site/CNAME')
+protected = ('.github/workflows', 'site/CNAME')
+kept = git('ls-tree', '-r', '--name-only', 'HEAD', '--', *protected).stdout.splitlines()
+indexed = set(git('ls-files', '--', *protected).stdout.splitlines())
+removed = sorted(indexed - set(kept))
+# restore cannot remove an unmerged file absent from HEAD (modify/delete conflict).
+if removed:
+    git('rm', '-f', '--ignore-unmatch', '--', *removed)
+if kept:
+    git('restore', '--source=HEAD', '--staged', '--worktree', '--', *kept)
 conflicts = git('diff', '--name-only', '--diff-filter=U').stdout.splitlines()
 managed = {'package.json', 'package-lock.json', 'CHANGELOG.md'}
 if set(conflicts) - managed:
