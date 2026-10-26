@@ -24,7 +24,7 @@ for every company:
   RPKI and BGP hijacks, DDoS, cooling failures, Red Sea and Baltic cable cuts,
   sovereign internet drills and other geopolitical events.
 
-Version: 1.29.0-qol.4 (2026-10-26)
+Version: 1.30.0-qol.1 (2026-10-26)
 Source: https://github.com/fjaeckel/seriesoftubes
 
 ## Learn how the internet really works
