@@ -725,12 +725,12 @@ test('#20 local PNIs satisfy local breakout only while Tier 1, without changing 
 });
 
 test('#36 own IX uplinks use ports, split across sites and stay within fabric capacity',()=>{
- const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.lvl=4;ACT.buildPop({city:'mex'});ACT.foundIx({city:'mex'});ACT.addSite({city:'mex'});compute()");
+ const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'mex'});ACT.foundIx({city:'mex'});ACT.addSite({city:'mex'});compute()");
  const cap=ev("ixCap('mex')"),ports=ev("portsUsed('mex')"),mo=ev("ixMo('mex')"),cash=ev('S.cash');
- ev("ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
+ ev("ACT.lagIx({city:'mex',d:1});ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
  assert.equal(ev('S.ixn.mex'),2);assert.equal(ev('S.ixSite.mex'),'ab');
  assert.equal(ev("portsUsed('mex')"),ports+1);assert.equal(ev('S.cash'),cash-ev('PORT[S.ixp.mex].setup'));
- assert.equal(ev("ixMo('mex')"),mo);assert.equal(ev("ixCap('mex')"),cap,'extra uplinks do not invent switching capacity');
+ assert.equal(ev("ixMo('mex')"),Math.round(mo*1.5));assert.equal(ev("ixCap('mex')"),cap,'extra uplinks do not invent switching capacity');
  for(const site of ['a','b']){ev(`S.inc=[{type:'site',ref:'mex',site:'${site}',until:S.day+10}];compute()`);assert.equal(ev("ixCap('mex')"),cap);}
  ev("ACT.siteSet({k:'ix',id:'mex',s:'b'});S.inc=[{type:'site',ref:'mex',site:'b',until:S.day+10}];compute()");assert.equal(ev("ixCap('mex')"),0);
  ev("S.inc=[];ACT.siteSet({k:'ix',id:'mex',s:'ab'});ACT.lagIx({city:'mex',d:-1})");assert.equal(ev('S.ixn.mex'),1);assert.equal(ev('S.ixSite.mex'),'a');assert.equal(ev("portsUsed('mex')"),ports);
@@ -738,7 +738,7 @@ test('#36 own IX uplinks use ports, split across sites and stay within fabric ca
  assert.match(ev("$('panelBody').textContent"),/Router uplinks/);assert.equal(ev("ixCap('mex')"),cap);
  ev("delete S.ixn.mex;delete S.ixSite.mex;S=migrate(JSON.parse(JSON.stringify(S)));compute()");assert.equal(ev("ixCap('mex')"),cap,'legacy own IX keeps its capacity');
  ev("S.pops.mex.rgen=0;S.pops.mex.routers=1;S.pni=Array.from({length:7},(_,i)=>({id:'p'+i,net:'cog',city:'mex',tier:1}));window.before=S.cash;ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
- assert.equal(ev('S.cash'),ev('before'));assert.equal(ev('S.ixn.mex||1'),1);assert.notEqual(ev('S.ixSite.mex'),'ab');
+ assert.equal(ev('S.cash'),ev('before'));assert.equal(ev('S.ixn.mex||1'),1);assert.equal(ev('S.ixSite.mex'),'ab','upstream switches can be split without buying router ports');
  ev("S.pni=[];S.cash=0;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex||1'),1);
  ev("S.cash=1e8;S.ixn.mex=LAG_MAX;window.before=S.cash;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex'),ev('LAG_MAX'));assert.equal(ev('S.cash'),ev('before'));
  assert.deepEqual(errors,[]);
@@ -1115,5 +1115,120 @@ test('fiber between nearby cities bends gently instead of looping around the nei
   ev("const L=(a,b)=>{UI.via=null;UI.lmode='wave';UI.route='diverse';openLinkModal(a,b);ACT.buildLink({tier:1});closeModal();};L('tor','ott');L('ott','mtl');L('tor','nyc');L('tor','mtl');L('mtl','nyc');L('tor','ash');L('ash','nyc');GEO.clear()");
   const worst = ev("Math.max(...S.links.map(l=>{const g=linkGeom(l),A=CITY[l.a],B=CITY[l.b],L=Math.hypot(B.x-A.x,B.y-A.y);return Math.max(...g.pts.map(p=>segDist(p[0],p[1],[A.x,A.y],[B.x,B.y])))/L;}))");
   assert.ok(worst < 0.3, `worst bend is ${worst.toFixed(2)}× its length`);
+  assert.deepEqual(errors, []);
+});
+
+test('#105 swapping the only router in an empty POP needs no maintenance window', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'ams'})");
+  assert.equal(ev("popIdle('ams')"), true);
+  const inc0 = ev('S.inc.length'), n0 = ev('S.stats.incidents');
+  ev("ACT.upRouter({city:'ams',g:1})");
+  assert.equal(ev('S.pops.ams.rgen'), 1, 'upgraded');
+  assert.equal(ev('S.inc.length'), inc0, 'no NOC warning');
+  assert.equal(ev('S.stats.incidents'), n0, 'not counted as an incident');
+  assert.ok(!(ev('S.pops.ams.down') > ev('S.day')), 'no downtime');
+  // once something depends on it, the window is back
+  ev("ACT.launchBB({city:'ams'});S.day++");
+  assert.equal(ev("popIdle('ams')"), false);
+  ev("ACT.upRouter({city:'ams',g:2})");
+  assert.equal(ev("S.inc.filter(i=>i.type==='maint'&&i.ref==='ams').length"), 1);
+  assert.ok(ev('S.pops.ams.down') > ev('S.day'));
+  assert.deepEqual(errors, []);
+});
+
+test('#104 declining a loan offer clears the bank badge while paused', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});UI.speed=0;S.loanOffers=[];spawnLoanOffer(false);renderHUD()");
+  assert.equal(ev("$('hBank').hidden"), false);
+  ev("ACT.declineLoan({id:S.loanOffers[0].id})");
+  assert.equal(ev("$('hBank').hidden"), true, 'badge gone without a new day');
+  assert.equal(ev("JSON.parse(localStorage.getItem('sot-save-v1')).loanOffers.length"), 0, 'saved right away');
+  assert.deepEqual(errors, []);
+});
+
+test('#88 no subsea cable longer than any optic can light, and a refund for calling one off', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e10;S.lvl=13;S.won=true;for(const g of GOALS)S.done[g.id]=0");
+  assert.match(ev("ownCabWhy('nyc','syd')"), /more than any optic can light/);
+  assert.equal(ev("ownCabWhy('lax','syd')"), '', 'Los Angeles to Sydney still works');
+  assert.ok(ev("subCarrier(ownCabKm('lax','syd'))") > 0);
+  // half-way through laying it: most of the unlaid part comes back
+  ev("S.day=100;S.links.push({id:'oc',a:'lax',b:'syd',kind:'df',own:true,sub:true,sys:'roadm',ch:[],km:ownCabKm('lax','syd'),cname:'Kraken-1',mo:1,trench:'own:oc',cut:0,day:0,ready:200,pairs:1})");
+  const want = ev("Math.round(ownCabCost(ownCabKm('lax','syd'))*0.75*0.5)");
+  assert.equal(ev("cabBack(S.links.find(l=>l.id==='oc'))"), want);
+  const c0 = ev('S.cash');
+  ev("ACT.rmLink({id:'oc'});ACT.rmLink({id:'oc'})");
+  assert.equal(ev("S.links.some(l=>l.id==='oc')"), false);
+  assert.equal(ev('S.cash') - c0, want);
+  // a finished cable that works is yours for good; one nothing can light (old saves) goes back in full
+  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:ownCabKm('lax','syd'),ready:0})"), 0);
+  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:18387,ready:0})"), ev('ownCabCost(18387)'));
+  assert.deepEqual(errors, []);
+});
+
+test('#50 a city without a cable landing points to the nearest one', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'osl'});UI.pending=null;openLinkModal('osl','nyc')");
+  const t = ev("$('modalCard').textContent");
+  assert.match(t, /No subsea cable lands in Oslo\. The nearest landing station is Stavanger/);
+  assert.doesNotMatch(t, /nowhere/);
+  assert.deepEqual(errors, []);
+});
+
+test('#36 your own IX moves between buildings, or runs a switch in both', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'beg'});ACT.launchBB({city:'beg'});ACT.foundIx({city:'beg'});ACT.addSite({city:'beg'});compute()");
+  assert.ok(ev("!!S.myIx.beg"));
+  const mo = ev("ixMo('beg')"), cap = ev("ixCap('beg')");
+  assert.ok(cap > 0);
+  // no LAG for a switch you own
+  ev("UI.sel={type:'city',id:'beg'};UI.tab='peer';renderPanel()");
+  assert.equal(ev("!!document.querySelector('#panel [data-act=lagIx]')"), true, 'optional local uplink controls remain available');
+  // move it to B: a dark A no longer matters
+  ev("ACT.siteSet({k:'ix',id:'beg',s:'b'})");
+  assert.equal(ev("S.ixSite.beg"), 'b');
+  ev("addInc({type:'site',ref:'beg',site:'a',until:S.day+3,msg:'x',cost:0});compute()");
+  assert.equal(ev("ixCap('beg')"), cap, 'B is up');
+  // both buildings: a second switch for half the fabric's fee, survives either one going dark
+  ev("ACT.siteSet({k:'ix',id:'beg',s:'ab'})");
+  assert.equal(ev("S.ixSite.beg"), 'ab');
+  assert.equal(ev("ixMo('beg')"), Math.round(mo * 1.5));
+  assert.equal(ev("(S.ixn||{}).beg||1"), 1, 'no LAG member bought');
+  ev("S.inc=[];addInc({type:'site',ref:'beg',site:'b',until:S.day+3,msg:'x',cost:0});compute()");
+  assert.equal(ev("ixCap('beg')"), cap);
+  ev("addInc({type:'site',ref:'beg',site:'a',until:S.day+3,msg:'x',cost:0});compute()");
+  assert.equal(ev("ixCap('beg')"), 0, 'both dark');
+  assert.deepEqual(errors, []);
+});
+
+test('#56 parallel waves of different sizes are labelled per size, not as N times the total', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'nyc'});ACT.buildPop({city:'lon'})");
+  ev("for(let i=0;i<3;i++){UI.via='grace';UI.route='same';openLinkModal('nyc','lon');ACT.buildLink({tier:1});closeModal();}compute()");
+  const lbl = () => ev("(()=>{const g=linkGroups()[0];return groupLabel(g,g)})()");
+  assert.equal(ev("linkGroups().length"), 1);
+  assert.equal(lbl(), '3×100G', 'equal sizes keep the short form');
+  ev("S.links[2].tier=2;S.links[0].tier=3;S.links[1].tier=3");
+  assert.equal(lbl(), '2×800G + 400G');
+  ev("S.links[1].tier=2");
+  assert.equal(lbl(), '800G + 2×400G');
+  ev("S.links.pop()");
+  assert.equal(lbl(), '800G + 400G', 'not "2 × 1.2T"');
+  assert.match(ev("(()=>{const g=linkGroups()[0];return groupLabel(g,[g[0]])})()"), /^800G \+ 400G · 1\/2 /);
+  ev("cam.z=2;draw(0)");
+  assert.deepEqual(errors, []);
+});
+
+test('#107 a bigger optic never carries less than a smaller one at the same distance', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  // every optic on the same line system, at every distance, on land and subsea
+  const bad = ev(`(()=>{const out=[],ks=Object.keys(OPT);for(const sub of [false,true])for(let km=100;km<=19000;km+=50){const l={km,sub,regen:0};
+    for(const a of ks)for(const b of ks){const A=OPT[a],B=OPT[b];if(A.sys!==B.sys||A.g<=B.g)continue;const ga=optMode(a,l),gb=optMode(b,l);
+      if(gb&&(!ga||ga.g<gb.g))out.push(a+'<'+b+'@'+km+(sub?'s':''));}}return out.slice(0,5).join()})()`);
+  assert.equal(bad, '', 'bigger optic falls back to whatever the smaller one manages');
+  assert.equal(ev("optMode('tp32',{km:4500,sub:false,regen:0}).g"), 1200);
+  assert.equal(ev("optMode('tp32',{km:7000,sub:true,regen:0}).g"), 1200);
   assert.deepEqual(errors, []);
 });

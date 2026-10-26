@@ -520,3 +520,75 @@ test('Stuttgart sits between Frankfurt and Zurich, and Hamburg and Munich are on
   assert.equal(ev("NET.lvl.pops.includes('ham')&&NET.dtk.pops.includes('ham')"), true);
   assert.deepEqual(errors, []);
 });
+
+test('Brazil has every IX.brrr location, in the right order on the map', () => {
+  const { ev, errors } = load();
+  start(ev);
+  const br = JSON.parse(ev('JSON.stringify(CITIES.filter(c=>c.br).map(c=>c.id))'));
+  assert.equal(br.length, 40, 'the forty IX.br locations');
+  const y = c => ev(`CITY.${c}.y`), x = c => ev(`CITY.${c}.x`);
+  for (const [n, s] of [['bsb', 'bhz'], ['bhz', 'rio'], ['vix', 'rio'], ['ssa', 'vix'], ['nat', 'jpa'], ['jpa', 'rec'], ['rec', 'mcz'], ['sao', 'cwb'], ['cwb', 'poa'], ['cpq', 'sao'], ['cxj', 'poa']])
+    assert.ok(y(n) < y(s), `${n} is north of ${s}`);
+  for (const [w, e] of [['mao', 'bel'], ['rbr', 'pvh'], ['cgb', 'gyn'], ['mgf', 'ldb'], ['poa', 'fln']]) assert.ok(x(w) < x(e), `${w} is west of ${e}`);
+  for (const c of br) {
+    assert.ok(ev(`CITY.${c}.ix.startsWith('IX.brrr')&&CITY.${c}.ixCheap===0.3`), `${c} has a cheap IX.brrr`);
+    assert.ok(ev(`NETS.some(n=>n.price&&n.pops.includes('${c}'))`), `${c} has a transit seller`);
+    assert.ok(ev(`ixMembers('${c}').includes('viv')&&ixMembers('${c}').includes('oio')`), `${c} IX has the national networks`);
+  }
+  assert.ok(ev("ixPortMo('cwb',1)") < ev("PORT[1].ix*0.5"), 'nonprofit IX ports are cheap');
+  assert.deepEqual(errors, []);
+});
+
+test('the Amazon doubles overland fiber, and there is a national-operator scenario', () => {
+  const { ev, errors } = load();
+  start(ev);
+  assert.equal(ev("landMult('sao','bsb')"), 1);
+  assert.equal(ev("landMult('bsb','mao')"), 2);
+  assert.equal(ev("landMult('mao','bel')"), 2);
+  assert.match(ev("landWhy('bsb','mao')"), /Amazon/);
+  assert.equal(ev("landMult('lpb','sao')"), 2, 'La Paz is across the Andes');
+  assert.equal(ev("isSub('gua','mex')"), false, 'Central America is overland');
+  for (const c of ['mvd', 'asu', 'cor', 'lpb', 'uio', 'mde', 'ccs', 'gua', 'sjo', 'qro', 'mty', 'gdl'])
+    assert.ok(ev(`NETS.some(n=>n.price&&n.pops.includes('${c}'))`), `${c} has a transit seller`);
+  assert.ok(ev("CABLE_PAIRS.some(p=>p.cid==='sam1'&&p.a==='ssa')&&CABLE_PAIRS.some(p=>p.cid==='tannat'&&p.b==='mvd')"), 'Salvador and Montevideo have cables');
+  ev("ACT.startScn({id:'ixbr',sure:1})");
+  assert.equal(ev('S.scn.id'), 'ixbr');
+  assert.equal(ev('brIxN()'), 0);
+  ev("S.cash=1e9;for(const c of ['sao','rio','mao'])ACT.buildPop({city:c});S.ixp.sao=1;S.ixp.mao=1;compute()");
+  assert.equal(ev('brIxN()'), 2);
+  assert.equal(ev("scnProg().items[1].v"), 1, 'Manaus step done');
+  assert.deepEqual(errors, []);
+});
+
+test('a Tier 1 reaches every Latin American and African network through the carriers they buy transit from', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});S.transit=[];S.ixp={};S.pni=[];for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:'fra',tier:0});compute()");
+  for (const n of ['oio', 'tmt', 'bsn', 'mvs', 'llt', 'ant', 'tgo', 'liq', 'scm', 'agc', 'djt', 'mtx', 'art', 'eth', 'mrc']) {
+    assert.equal(ev(`NET.${n}.up.every(id=>NET[id].type==='t1')`), true, `${n} buys from Tier 1s`);
+    assert.equal(ev(`R.reachable.${n}`), true, `${n} is reachable`);
+  }
+  assert.deepEqual(errors, []);
+});
+
+test('Africa: more countries, cables along both coasts, border costs and Cape to Cairo', () => {
+  const { ev, errors } = load();
+  start(ev);
+  const af = JSON.parse(ev("JSON.stringify(CITIES.filter(c=>c.reg==='AF').map(c=>c.id))"));
+  assert.ok(af.length >= 26);
+  for (const c of af) {
+    assert.ok(ev(`!!CITY.${c}.cc&&!!CITY.${c}.ix`), `${c} has a country and an IX`);
+    assert.ok(ev(`NETS.some(n=>n.price&&n.pops.includes('${c}'))`), `${c} has a transit seller`);
+  }
+  for (const c of ['dkr', 'abj', 'acc', 'dla', 'lad', 'cas', 'alg', 'tun', 'jib', 'mba', 'dar', 'mpm', 'dur', 'wdh'])
+    assert.ok(ev(`CABLE_PAIRS.some(p=>p.a==='${c}'||p.b==='${c}')`), `${c} has a cable`);
+  assert.ok(ev("CABLE_PAIRS.some(p=>p.cid==='sail'&&p.a==='for'&&p.b==='dla')"), 'Brazil to Cameroon');
+  assert.ok(ev("CABLE_PAIRS.some(p=>p.cid==='sacs'&&p.b==='lad')"), 'Brazil to Angola');
+  assert.ok(ev("CABLE_PAIRS.some(p=>p.cid==='seacm'&&p.a==='jib'&&p.b==='bom')"), 'Djibouti to Mumbai');
+  assert.equal(ev("landMult('nbo','kla')"), 2, 'Kenya to Uganda crosses a border');
+  assert.equal(ev("landMult('jnb','dur')"), 1, 'inside South Africa');
+  assert.match(ev("landWhy('nbo','kla')"), /border/);
+  ev("ACT.startScn({id:'c2c',sure:1})");
+  assert.equal(ev('S.scn.id'), 'c2c');
+  assert.equal(ev('scnProg().items.length'), 4);
+  assert.deepEqual(errors, []);
+});
