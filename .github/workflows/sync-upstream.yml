@@ -1,0 +1,101 @@
+name: Sync upstream and publish
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'Flol0/seriesoftubes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      publish: ${{ steps.publish.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Configure merge identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Merge upstream without guessing at conflicts
+        id: sync
+        run: python3 scripts/sync-upstream.py
+      - name: Decide whether publishing is needed
+        id: publish
+        env:
+          CHANGED: ${{ steps.sync.outputs.changed }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          live=$(git show origin/gh-pages:version.json | jq -r .version)
+          if [ "$CHANGED" = true ] || [ "$MANUAL" = true ] || [ "$live" != "$version" ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.publish.outputs.ready == 'true'
+        run: npm ci
+      - if: steps.publish.outputs.ready == 'true'
+        name: Test all game behavior and translations
+        run: |
+          node --test --test-concurrency=1 tests/*.test.js
+          node scripts/i18n-check.js
+          git diff --check
+          git diff --cached --check
+      - if: steps.publish.outputs.ready == 'true'
+        name: Build
+        run: REQUIRE_NOTES=1 npm run build
+      - if: steps.sync.outputs.changed == 'true'
+        name: Commit and push only after successful checks
+        run: |
+          git add -u
+          git commit -m "Sync upstream $(node -p "require('./package.json').version")"
+          git push origin HEAD:main
+      - if: steps.publish.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - if: steps.publish.outputs.ready == 'true'
+        name: Keep the built-site branch current
+        run: |
+          git worktree add "$RUNNER_TEMP/pages" origin/gh-pages
+          rsync -a --delete --exclude=.git _site/ "$RUNNER_TEMP/pages/"
+          git -C "$RUNNER_TEMP/pages" add -A
+          if ! git -C "$RUNNER_TEMP/pages" diff --cached --quiet; then
+            git -C "$RUNNER_TEMP/pages" commit -m "Deploy $(node -p "require('./package.json').version")"
+            git -C "$RUNNER_TEMP/pages" push origin HEAD:gh-pages
+          fi
+
+  deploy:
+    needs: sync
+    if: needs.sync.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
