@@ -1,7 +1,7 @@
 {
-  "version": "1.28.0-qol.3",
-  "date": "2026-10-25",
+  "version": "1.29.0-qol.1",
+  "date": "2026-10-26",
   "notes": [
-    "Updated to the latest upstream router trade-ins, daily swap limit, speed-based requirements and gentler link bends. Local QoL improvements remain included."
+    "Updated to upstream 1.29.0 and latest fixes, preserving local QoL tools and adapting reach filters to optimized routing. Own-IX site resilience now follows upstream switch placement and operating costs; optional router uplinks remain available."
   ]
 }
