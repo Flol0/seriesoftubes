@@ -507,7 +507,7 @@ test('#79 Benelux: Brussels red tape, the Flanders duopoly, Oostkamp trawlers an
   assert.deepEqual(errors, []);
 });
 
-test('Stuttgart sits between Frankfurt and Zurich, and Hamburg and Munich are on the map', () => {
+test('Stuttgart sits between Frankfurt and Zurich, and Hamburg, Munich and Düsseldorf are on the map', () => {
   const { ev, errors } = load();
   const y = c => ev(`CITY.${c}.y`), x = c => ev(`CITY.${c}.x`);
   assert.ok(y('fra') < y('stg') && y('stg') < y('zrh'), 'north to south: Frankfurt, Stuttgart, Zurich');
@@ -518,6 +518,10 @@ test('Stuttgart sits between Frankfurt and Zurich, and Hamburg and Munich are on
   assert.ok(y('ham') < y('ber') && y('ham') < y('fra'), 'Hamburg is up north');
   assert.equal(ev("CITY.ham.ix"), 'Moin-IX');
   assert.equal(ev("NET.lvl.pops.includes('ham')&&NET.dtk.pops.includes('ham')"), true);
+  assert.ok(x('dus') < x('fra') && x('dus') > x('ams') && y('dus') > y('ams') && y('dus') < y('fra'), 'Düsseldorf: between Amsterdam and Frankfurt');
+  assert.equal(ev("CITY.dus.ix"), 'Altbier-IX');
+  assert.ok(ev("kmBetween('dus','ams')") < ev("kmBetween('fra','ams')"), 'closer to Amsterdam than Frankfurt is');
+  for (const n of ['ntt', 'tly', 'cog', 'drz', 'vdp', 'dtk', 'nfx', 'akm', 'cfl', 'amz', 'msf', 'bdc']) assert.ok(ev(`NET.${n}.pops.includes('dus')`), `${n} is in Düsseldorf, as on PeeringDB`);
   assert.deepEqual(errors, []);
 });
 
@@ -590,5 +594,217 @@ test('Africa: more countries, cables along both coasts, border costs and Cape to
   ev("ACT.startScn({id:'c2c',sure:1})");
   assert.equal(ev('S.scn.id'), 'c2c');
   assert.equal(ev('scnProg().items.length'), 4);
+  assert.deepEqual(errors, []);
+});
+
+test('Pacific islands: real landings, real exchanges only, and island hops carry more per wave', () => {
+  const { ev, errors } = load();
+  start(ev);
+  const isl = ['hnl', 'gum', 'ror', 'maj', 'pom', 'hir', 'nou', 'suv', 'tbu', 'apw', 'ppg', 'ppt'];
+  for (const c of isl) {
+    assert.ok(ev(`CABLE_PAIRS.some(p=>p.a==='${c}'||p.b==='${c}')`), `${c} has a cable`);
+    assert.ok(ev(`NETS.some(n=>n.price&&n.pops.includes('${c}'))`), `${c} has a transit seller`);
+    assert.ok(ev(`isSub('${c}','syd')&&isSub('${c}','lax')`), `${c} is an island`);
+  }
+  // only islands with a working exchange today get one
+  assert.deepEqual(isl.filter(c => ev(`!!CITY['${c}'].ix`)), ['hnl', 'gum', 'hir', 'nou', 'suv']);
+  assert.equal(ev(`NETS.filter(n=>Array.isArray(n.ix)&&n.ix.some(c=>CITY[c]&&!CITY[c].ix&&${JSON.stringify(isl)}.includes(c))).length`), 0);
+  // every new network is reachable through a Tier 1, so Tier 1 players keep their reach
+  assert.equal(ev(`NETS.filter(n=>n.type!=='t1'&&n.pops.every(c=>${JSON.stringify(isl)}.includes(c)||['tok','syd','lax'].includes(c))&&n.pops.some(c=>${JSON.stringify(isl)}.includes(c))&&!(n.up||[]).some(u=>NET[u].type==='t1')).map(n=>n.id).join()`), '');
+  // a wave across the whole ocean carries far less than the same trip broken at the islands
+  const hop = (path) => ev(`Math.min(...${JSON.stringify(path)}.slice(1).map((c,i)=>Math.max(...cablesFor(${JSON.stringify(path)}[i],c).map(p=>subCarrier(p.km)))))`);
+  const direct = (a, b) => ev(`Math.max(...cablesFor('${a}','${b}').map(p=>subCarrier(p.km)))`);
+  assert.equal(direct('sjc', 'syd'), 400);
+  assert.equal(hop(['sjc', 'hnl', 'suv', 'syd']), 1600, 'California to Sydney via Hawaii and Fiji');
+  assert.equal(direct('akl', 'sea'), 400);
+  assert.equal(hop(['akl', 'suv', 'hnl', 'sea']), 1600);
+  assert.equal(direct('lax', 'hkg'), 400);
+  assert.ok(hop(['lax', 'hnl', 'gum', 'hkg']) >= 1200, 'Hong Kong via Hawaii and Guam');
+  assert.equal(direct('scl', 'syd'), 400);
+  assert.ok(hop(['scl', 'ppt', 'syd']) >= 1200, 'South America to Oceania via Tahiti');
+  // in play: 1.6T waves hop by hop from Los Angeles to Sydney
+  ev("for(const c of ['lax','hnl','suv','syd']){ACT.buildPop({city:c});S.pops[c].rgen=3;}");
+  const wave = (a, b, via) => ev(`UI.via='${via}';UI.route='same';openLinkModal('${a}','${b}');ACT.buildLink({tier:4});closeModal();S.links.length`);
+  assert.match(ev("subWaveWhy(4,cablesFor('lax','syd').concat(cablesFor('sjc','syd'))[0].km,true)"), /per carrier/, 'no 1.6T straight across');
+  const n0 = ev('S.links.length');
+  wave('lax', 'hnl', 'seaus'); wave('hnl', 'suv', 'scx'); wave('suv', 'syd', 'scxn');
+  assert.equal(ev('S.links.length'), n0 + 3);
+  ev('compute()');
+  assert.equal(ev("fastPath('lax','syd',1600)"), true);
+  assert.equal(ev("fastPath('lax','syd',3200)"), false);
+  // the Stepping Stones scenario starts in Honolulu with 1.6T gear
+  ev("ACT.startScn({id:'pac',sure:1})");
+  assert.equal(ev('S.scn.id'), 'pac');
+  assert.ok(ev('!!S.pops.hnl') && ev('S.lvl') >= 4);
+  assert.equal(ev('scnProg().items.length'), 3);
+  ev('cam.z=0.5;draw(0);cam.z=2;draw(0)');
+  assert.deepEqual(errors, []);
+});
+
+test('subsea cable designs trade construction cost and time for previewed latency', () => {
+  const { ev, dom, errors } = load();
+  try {
+    ev("ACT.start({});S.cash=1e10;S.lvl=4;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'lon'});ACT.buildPop({city:'nyc'});UI.lmode='df';UI.dfSrc='cable';openLinkModal('lon','nyc')");
+    const quotes = JSON.parse(ev("JSON.stringify(['standard','optimized','express'].map(d=>seaQuote('lon','nyc',d)))"));
+    assert.ok(quotes[0].ms > quotes[1].ms && quotes[1].ms > quotes[2].ms);
+    assert.ok(quotes[1].cost >= quotes[0].cost * 3 && quotes[2].cost >= quotes[0].cost * 7);
+    assert.ok(quotes[1].days >= quotes[0].days * 1.3 && quotes[2].days >= quotes[0].days * 1.7);
+    assert.ok(quotes[2].days < 3 * 365, 'a low-latency Atlantic cable takes years, not most of a decade');
+    assert.equal(quotes[2].ms, ev("Math.min(...cablesFor('lon','nyc').map(c=>linkLat({kind:'wave',km:c.km,cable:c.cid})))"), 'express competes with Hibernia');
+    for (const q of quotes) assert.ok(dom.window.document.getElementById('modalCard').textContent.includes(q.ms.toFixed(1) + ' ms one-way'), 'every latency is visible before ordering');
+    for (const [i, design] of ['standard', 'optimized', 'express'].entries()) {
+      ev("UI.lmode='df';UI.dfSrc='cable';openLinkModal('lon','nyc')");
+      ev(`document.querySelector('#modalCard [data-act=seaDesign][data-args*=${design}]').click()`);
+      const cash = ev('S.cash'), day = ev('S.day');
+      ev('ACT.orderCable()');
+      const l = JSON.parse(ev('JSON.stringify(S.links[S.links.length-1])'));
+      assert.equal(l.seaDesign, design);
+      assert.equal(cash - ev('S.cash'), quotes[i].cost);
+      assert.equal(l.ready - day, quotes[i].days);
+      assert.equal(ev(`linkLat(S.links[S.links.length-1])`), quotes[i].ms);
+      assert.equal(l.km, quotes[i].km);
+      assert.match(l.trench, /^own:/, 'independent from the reference cable');
+      ev('S=migrate(JSON.parse(JSON.stringify(S)))');
+      assert.equal(ev('linkLat(S.links[S.links.length-1])'), quotes[i].ms, 'save round trip retains latency');
+    }
+    ev("UI.pending={a:'lon',b:'nyc'};UI.seaDesign='express';S.cash=seaQuote('lon','nyc','express').cost-1;window.__n=S.links.length;ACT.orderCable()");
+    assert.equal(ev('S.links.length'), ev('__n'), 'premium funds checked at purchase');
+    ev("S.links[0].seaDesign='bogus';S=sanitize(S)");
+    assert.equal(ev('S.links[0].seaDesign'), 'standard');
+    assert.deepEqual(errors, []);
+  } finally { dom.window.close(); }
+});
+
+test('old owned cables keep their latency and premium designs work without a leased route', () => {
+  const { ev, dom, errors } = load();
+  try {
+    ev('ACT.start({})');
+    assert.equal(ev("linkLat({kind:'df',own:true,sub:true,km:6405})"), 6405 * 1.1 / 200);
+    assert.equal(ev("linkLat({kind:'df',own:true,sub:false,seaDesign:'express',km:6405})"), 6405 * 1.1 / 200, 'land fiber is unchanged');
+    const q = JSON.parse(ev("JSON.stringify(['standard','optimized','express'].map(d=>seaQuote('cbo','nyc',d)))"));
+    assert.ok(q[0].ms > q[1].ms && q[1].ms > q[2].ms);
+    assert.deepEqual(errors, []);
+  } finally { dom.window.close(); }
+});
+
+test('submarine terminal and engineering upgrades commission independently and combine for Pacific reach', () => {
+  const { ev, dom, errors } = load();
+  try {
+    ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;S.links.push({id:'pacific',a:'sin',b:'lax',kind:'df',own:true,sub:true,km:16608,sys:'roadm',ch:['tp16'],ready:0,cut:0,mo:1})");
+    const before = ev("linkLat(S.links[0])"), cash = ev('S.cash');
+    assert.equal(ev('dfCap(S.links[0])'), 400);
+    ev("ACT.subUpgrade({id:'pacific',k:'terminal'})");
+    assert.equal(cash - ev('S.cash'), 5000000);
+    assert.equal(ev('dfCap(S.links[0])'), 400, 'no benefit during commissioning');
+    const paid = ev('S.cash');
+    ev("ACT.subUpgrade({id:'pacific',k:'terminal'})");
+    assert.equal(ev('S.cash'), paid, 'cannot pay twice');
+    ev('S.day=S.links[0].subterminal');
+    assert.equal(ev("optG('tp16',{...S.links[0],km:12000})"), 800, 'terminals improve reach independently');
+    assert.equal(ev('dfCap(S.links[0])'), 400, 'this Pacific route still needs engineering');
+    ev("ACT.subUpgrade({id:'pacific',k:'engineering'})");
+    assert.equal(paid - ev('S.cash'), 12000000 + 16608 * 1000);
+    ev('S.day=S.links[0].subengineering-1');
+    assert.equal(ev('dfCap(S.links[0])'), 400);
+    ev('S.day++;compute()');
+    assert.equal(ev('dfCap(S.links[0])'), 800, 'combined upgrades deliver 800G across 16,608 km');
+    assert.equal(ev('linkLat(S.links[0])'), before, 'transmission upgrades do not change latency');
+    ev('S=migrate(JSON.parse(JSON.stringify(S)))');
+    assert.equal(ev('dfCap(S.links[0])'), 800, 'upgrades survive a save round trip');
+    ev("UI.sel={type:'link',id:'pacific'};renderPanel()");
+    assert.match(dom.window.document.getElementById('panelBody').textContent, /Premium submarine terminals/);
+    assert.match(dom.window.document.getElementById('panelBody').textContent, /800 Gbps to 16,875 km/);
+    assert.equal(ev("optG('tp16',{...S.links[0],km:12000,subterminal:undefined})"), 800, 'engineering also helps without premium terminals');
+    assert.equal(ev("optG('tp16',{...S.links[0],km:7000})"), 1200, 'upgrades do not extend full-rate reach');
+    assert.equal(ev("optG('zr4',{...S.links[0],km:5000})"), 0, 'router pluggables do not gain submarine terminal benefits');
+    assert.deepEqual(errors, []);
+  } finally { dom.window.close(); }
+});
+
+test('new subsea builds include chosen transmission packages in the quote and saved order', () => {
+  const { ev, dom, errors } = load();
+  try {
+    ev("ACT.start({});S.cash=1e9;S.lvl=4;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'lon'});ACT.buildPop({city:'nyc'});UI.lmode='df';UI.dfSrc='cable';openLinkModal('lon','nyc')");
+    const baseline = JSON.parse(ev("JSON.stringify(seaQuote('lon','nyc'))"));
+    ev("document.querySelector('#modalCard [data-act=seaPackage][data-args*=terminal]').click();document.querySelector('#modalCard [data-act=seaPackage][data-args*=engineering]').click()");
+    const quote = JSON.parse(ev("JSON.stringify(seaQuote('lon','nyc','standard',{terminal:true,engineering:true}))"));
+    assert.equal(quote.days, baseline.days + 210);
+    assert.equal(quote.cost, baseline.cost + 5000000 + 12000000 + baseline.km * 1000);
+    assert.equal(quote.ms, baseline.ms);
+    const cash = ev('S.cash');
+    ev('ACT.orderCable()');
+    const cable = JSON.parse(ev('JSON.stringify(S.links[S.links.length-1])'));
+    assert.equal(cash - ev('S.cash'), quote.cost);
+    assert.equal(cable.ready - ev('S.day'), quote.days);
+    assert.equal(cable.subterminal, cable.ready);
+    assert.equal(cable.subengineering, cable.ready);
+    assert.equal(ev("subUpgradeReady(S.links[S.links.length-1],'terminal')"), false);
+    ev('S=migrate(JSON.parse(JSON.stringify(S)));S.day=S.links[S.links.length-1].ready');
+    assert.equal(ev("subUpgradeReady(S.links[S.links.length-1],'terminal')"), true);
+    assert.equal(ev("subUpgradeReady(S.links[S.links.length-1],'engineering')"), true);
+    assert.deepEqual(errors, []);
+  } finally { dom.window.close(); }
+});
+
+test('submarine upgrades reject invalid purchases and preserve baseline and terrestrial optics', () => {
+  const { ev, dom, errors } = load();
+  try {
+    ev("ACT.start({});S.cash=1e9;S.lvl=4;S.links.push({id:'land',a:'fra',b:'ams',kind:'df',own:true,km:7000,sys:'roadm',ch:['tp16'],ready:0},{id:'sea',a:'lon',b:'nyc',kind:'df',own:false,sub:true,km:7000,sys:'roadm',ch:['tp16'],ready:0})");
+    const cash = ev('S.cash');
+    ev("ACT.subUpgrade({id:'land',k:'terminal'});ACT.subUpgrade({id:'sea',k:'engineering'});ACT.subUpgrade({id:'land',k:'bogus'})");
+    assert.equal(ev('S.cash'), cash);
+    assert.equal(ev('dfCap(S.links[0])'), 800);
+    assert.equal(ev('dfCap(S.links[1])'), 1200);
+    ev("S.links[1].own=true;S.cash=1;ACT.subUpgrade({id:'sea',k:'terminal'})");
+    assert.equal(ev('S.links[1].subterminal'), undefined, 'insufficient cash');
+    ev("S.cash=1e9;S.lvl=3;ACT.subUpgrade({id:'sea',k:'terminal'})");
+    assert.equal(ev('S.links[1].subterminal'), undefined, 'locked below level 4');
+    ev("S.links[1].subterminal=-1;S.links[1].subengineering='yes';S.links[0].subterminal=0;S=sanitize(S)");
+    assert.equal(ev('S.links[1].subterminal'), undefined);
+    assert.equal(ev('S.links[1].subengineering'), undefined);
+    assert.equal(ev('S.links[0].subterminal'), undefined);
+    assert.deepEqual(errors, []);
+  } finally { dom.window.close(); }
+});
+
+test('own subsea cables after #78: refunds of what was paid, upgrades a route needs, fresh choices', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e11;S.lvl=13;S.won=true;for(const g of GOALS)S.done[g.id]=0;for(const c of ['lon','nyc','syd'])if(!S.pops[c])ACT.buildPop({city:c})");
+  const open = (a, b) => ev(`UI.pending=null;openLinkModal('${a}','${b}');ACT.ownCab()`);
+  const q = (sel) => ev(`(()=>{const e=document.querySelector('#modalCard ${sel}');return e?e.textContent:null;})()`);
+  // a low-latency cable called off at once returns 75% of what it really cost, not of a standard cable
+  open('lon', 'nyc');
+  assert.equal(ev("document.querySelectorAll('#modalCard button.start[data-act=seaDesign]').length"), 3, 'each design is one tappable card');
+  ev("document.querySelector('#modalCard [data-act=seaDesign][data-args*=express]').click()");
+  assert.match(q('button.start.on'), /Low latency/);
+  const c0 = ev('S.cash'); ev('ACT.orderCable()');
+  const lon = JSON.parse(ev("JSON.stringify(S.links.at(-1))")), paid = c0 - ev('S.cash');
+  assert.equal(lon.seaDesign, 'express'); assert.equal(lon.paid, paid);
+  assert.equal(ev('cabBack(S.links.at(-1))'), Math.round(paid * 0.75));
+  assert.equal(ev('UI.seaDesign'), 'standard', 'the next order starts from the standard design');
+  // its latency is worked out once per route, and stays the same
+  const ms = ev('linkLat(S.links.at(-1))'); assert.equal(ev('linkLat(S.links.at(-1))'), ms); assert.ok(ev('SEA_XF.size') >= 1);
+  // New York to Sydney needs premium terminals: the screen says so and will not order without them
+  open('nyc', 'syd');
+  assert.match(q('.why'), /Add Premium submarine terminals/);
+  assert.doesNotMatch(ev("document.getElementById('modalCard').textContent"), /A leased .* wave on this route/, 'no leased wave reaches that far, so no comparison with one');
+  assert.equal(ev("document.querySelector('#modalCard [data-act=orderCable]').disabled"), true);
+  const n = ev('S.links.length'); ev('ACT.orderCable()'); assert.equal(ev('S.links.length'), n, 'the order itself checks too');
+  ev("document.querySelector('#modalCard [data-act=seaPackage][data-args*=terminal]').click()");
+  assert.equal(q('.why'), null); assert.match(q('[data-act=seaPackage][data-args*=terminal]'), /\+30 days/);
+  // leaving and coming back to another route starts fresh
+  open('lon', 'nyc'); assert.equal(ev('!!UI.seaterminal'), false);
+  open('nyc', 'syd'); ev("document.querySelector('#modalCard [data-act=seaPackage][data-args*=terminal]').click();ACT.orderCable()");
+  const syd = JSON.parse(ev("JSON.stringify(S.links.at(-1))"));
+  assert.equal(syd.b, 'syd'); assert.equal(syd.subterminal, syd.ready);
+  ev('S.day=S.links.at(-1).ready'); assert.equal(ev("optG('tp16',S.links.at(-1))"), 400, 'lit across 18,387 km');
+  // upgrades bought later count toward the price; sanitize keeps a sane price and drops junk
+  ev("S.links.at(-1).subengineering=undefined;ACT.subUpgrade({id:S.links.at(-1).id,k:'engineering'})");
+  assert.ok(ev('S.links.at(-1).paid') > syd.paid);
+  ev("S.links.at(-1).paid='lots';S.links[0].paid=-5;S=sanitize(S)");
+  assert.equal(ev('S.links.at(-1).paid'), undefined); assert.equal(ev('S.links[0].paid'), undefined);
+  // advice about upgrades only on cables you own
+  ev("S.links.push({id:'iru',a:'lon',b:'nyc',kind:'df',own:false,sub:true,km:30000,sys:'roadm',ch:[],ready:0,cut:0,mo:1})");
+  assert.doesNotMatch(ev("chWhy(S.links.at(-1),'tp16')"), /submarine terminals/);
   assert.deepEqual(errors, []);
 });

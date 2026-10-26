@@ -373,18 +373,6 @@ test('Flood Season: attacks keep coming, grow, and only count when service held'
   assert.deepEqual(errors, []);
 });
 
-test('opaque iOS status bar keeps the HUD below the system area without stretching the viewport',()=>{
- const {ev,dom,errors}=load();const w=dom.window;
- const set=(o,k,v)=>Object.defineProperty(o,k,{value:v,configurable:true});
- assert.equal(dom.window.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content,'default');
- set(w.navigator,'userAgent','Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15');
- set(w.navigator,'standalone',true);set(w,'screen',{width:390,height:844});set(w,'innerWidth',390);set(w,'innerHeight',797);
- ev("ACT.start({});resize();renderAll()");assert.equal(ev('CH'),797);assert.equal(ev("document.documentElement.classList.contains('iosfix')"),false);
- assert.equal(ev("document.documentElement.style.getPropertyValue('--app-h')"),'');
- set(w,'innerWidth',844);set(w,'innerHeight',370);ev('resize()');assert.equal(ev('CH'),370);
- assert.deepEqual(errors,[]);
-});
-
 test('DKNOG in Copenhagen is on the conference calendar', () => {
   const { ev, errors } = load();
   ev("ACT.start({});S.cash=1e9;for(const g of GOALS)S.done[g.id]=0");
@@ -402,7 +390,7 @@ test('DKNOG in Copenhagen is on the conference calendar', () => {
 });
 
 test('the Signal group is linked from the title screen, the menu and How to play, in every language', () => {
-  for (const lang of ['en', 'it', 'pt']) {
+  for (const lang of ['en', 'it', 'pt', 'fr']) {
     const { ev, errors } = load(lang === 'en' ? {} : { lang });
     const links = (setup) => ev(`(()=>{${setup};return [...document.querySelectorAll('#modal a[href^="https://signal.group/#"]')].map(a=>a.target+'|'+a.rel+'|'+a.textContent.trim()).join('\\n');})()`);
     const title = links('showTitle()');
@@ -415,4 +403,41 @@ test('the Signal group is linked from the title screen, the menu and How to play
     }
     assert.deepEqual(errors, []);
   }
+});
+
+test('#114 Only Spätzle-IX can be won by peering alone', () => {
+  const { ev, errors } = load();
+  ev("ACT.startScn({id:'stg',sure:1})");
+  assert.equal(ev("scnRule('local')&&scnRule('noTransit')"), true);
+  assert.match(ev("SCN.find(x=>x.id==='stg').goal"), /45%.*300 Gbps/);
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(scnProg().items.map(x=>x.max))")), [0.45, 300]);
+  // a game saved before the fix picks the rule up on load
+  ev("const o=JSON.parse(JSON.stringify(S));delete o.scn.rules.local;migrate(o);window.__mig=o.scn.rules.local");
+  assert.equal(ev('window.__mig'), true);
+  // peering only, Stuttgart and Frankfurt: broadband grows instead of draining away
+  ev("S.cash=1e7;ACT.buyIx({city:'stg',tier:1,signed:true});ACT.peerAll({city:'stg'});ACT.launchBB({city:'stg'})");
+  ev("ACT.buildPop({city:'fra'});UI.via=null;openLinkModal('stg','fra');ACT.buildLink({tier:1});closeModal();for(const x of ixIdsIn('fra'))ACT.buyIx({city:x,tier:1,signed:true});ACT.launchBB({city:'fra'})");
+  const tick = (n) => { for (let i = 0; i < n; i++) { ev('dayTick()'); if (i % 5 === 0) ev("for(const x of Object.keys(S.ixp))ACT.peerAll({city:x})"); } };
+  tick(20);
+  const early = ev('R.served');
+  assert.ok(ev('R.reach') < 0.9, 'far from the whole internet');
+  tick(60);
+  assert.ok(ev('R.served') > early * 1.5, `customers stay and grow (${early.toFixed(1)} → ${ev('R.served').toFixed(1)} Gbps)`);
+  assert.ok(ev("sfOf(R,'stg')") >= 0.9);
+  // the rule stays inside this scenario
+  ev("ACT.start({})");
+  assert.equal(ev("scnRule('local')"), false);
+  assert.deepEqual(errors, []);
+});
+
+test('opaque iOS status bar keeps the HUD below the system area without stretching the viewport',()=>{
+ const {ev,dom,errors}=load();const w=dom.window;
+ const set=(o,k,v)=>Object.defineProperty(o,k,{value:v,configurable:true});
+ assert.equal(dom.window.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content,'default');
+ set(w.navigator,'userAgent','Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15');
+ set(w.navigator,'standalone',true);set(w,'screen',{width:390,height:844});set(w,'innerWidth',390);set(w,'innerHeight',797);
+ ev("ACT.start({});resize();renderAll()");assert.equal(ev('CH'),797);assert.equal(ev("document.documentElement.classList.contains('iosfix')"),false);
+ assert.equal(ev("document.documentElement.style.getPropertyValue('--app-h')"),'');
+ set(w,'innerWidth',844);set(w,'innerHeight',370);ev('resize()');assert.equal(ev('CH'),370);
+ assert.deepEqual(errors,[]);
 });

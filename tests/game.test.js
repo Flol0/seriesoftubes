@@ -192,7 +192,7 @@ test('Flowspec is a router-model capability, and each tool answers a flood', () 
   const http = ev("RG[0].fs=2;S.ev.ddos.vec='http';compute();const s=R.served;RG[0].fs=0;s");
   assert.ok(Math.abs(http - none) < 1, 'Flowspec is useless against HTTP');
   // Scrubbing cleans any vector, regardless of router. A 1T center swallows this 300 Gbps flood whole.
-  ev("S.ev.ddos.vec='dns';S.scrubAt='fra';S.scrubTier=1;S.scrubMode='always';compute()");
+  ev("S.ev.ddos.vec='dns';S.scrubs=[{city:'fra',tier:1}];S.scrubMode='always';compute()");
   assert.ok(ev('R.served') > none, 'scrubbing recovers real traffic');
   assert.deepEqual(errors, []);
 });
@@ -229,8 +229,8 @@ test('scrubbing tiers: capacity caps what a center can clean, and on-demand lags
   ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1});S.ev.ddos={city:'fra',vec:'dns',gbps:300,until:S.day+3,entry:{k:'t',lab:'x'},bh:false,start:S.day};compute()");
   const none = ev('R.served');
   // A 100G center cannot swallow a 300 Gbps flood; a 10T center can.
-  const small = ev("S.scrubAt='fra';S.scrubTier=0;S.scrubMode='always';compute();R.served");
-  const big = ev("S.scrubTier=2;compute();R.served");
+  const small = ev("S.scrubs=[{city:'fra',tier:0}];S.scrubMode='always';compute();R.served");
+  const big = ev("S.scrubs[0].tier=2;compute();R.served");
   assert.ok(big > small, 'a bigger scrubbing tier cleans more');
   assert.ok(big > none, 'the 10T center recovers the flood');
   // On-demand does nothing until it engages (SCRUB_DELAY days in).
@@ -266,7 +266,7 @@ test('SLA: a protected customer that still goes down costs an SLA credit, once',
   const { ev } = load();
   ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1});S.nextFail=1e9;S.nextEvent=1e9");
   // A DDoS protection customer, an overwhelming flood, a 100G center that can't cope.
-  ev("S.scrubAt='fra';S.scrubTier=0;S.biz.push({id:'b1',city:'fra',type:'scrub',bw:5,rate:900,mood:80,since:0,reqs:[]});S.ev.ddos={city:'fra',vec:'dns',gbps:6000,until:S.day+5,entry:{k:'t',lab:'x'},bh:false,start:S.day}");
+  ev("S.scrubs=[{city:'fra',tier:0}];S.biz.push({id:'b1',city:'fra',type:'scrub',bw:5,rate:900,mood:80,since:0,reqs:[]});S.ev.ddos={city:'fra',vec:'dns',gbps:6000,until:S.day+5,entry:{k:'t',lab:'x'},bh:false,start:S.day}");
   ev("dayTick()");
   assert.equal(ev('S.stats.sla'), 1, 'one SLA breach recorded');
   assert.ok(ev('S.biz[0].mood') < 70, 'the SLA breach dented their mood');
@@ -281,7 +281,7 @@ test('DDoS goal and badges unlock from the right state', () => {
   const okg = id => ev(`GOALS.find(g=>g.id==='${id}').ok()`);
   const okb = id => ev(`BADGES.find(b=>b.id==='${id}').ok()`);
   assert.equal(okg('scrub'), false, 'the DDoS goal starts incomplete');
-  ev("S.scrubAt='fra';S.scrubTier=0");
+  ev("S.scrubs=[{city:'fra',tier:0}]");
   assert.equal(okg('scrub'), true, 'a scrubbing center completes the goal');
   assert.equal(okb('toaster'), false);
   ev("S.stats.ddosHeld=1"); assert.equal(okb('toaster'), true, 'weathering a DDoS earns Toaster Wrangler');
@@ -352,5 +352,56 @@ test('loans: good terms need good credit, big loans want revenue, and the weird 
   assert.match(t, /of your transit bill/);
   assert.match(t, /rate set by the stars/);
   assert.match(t, /numerologist/);
+  assert.deepEqual(errors, []);
+});
+
+test('#117 several scrubbing centers: nearest first, spill to the next, and far ones haul the flood over the backbone', () => {
+  const { ev, errors, dom } = load();
+  // an old save with one center carries it over
+  ev("ACT.start({});S.cash=1e9;S.lvl=6;S.nextFail=1e9;S.nextEvent=1e9");
+  ev("const o=JSON.parse(JSON.stringify(S));o.scrubAt='fra';o.scrubTier=1;delete o.scrubs;migrate(o);window.__o=o");
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(window.__o.scrubs)")), [{ city: 'fra', tier: 1 }]);
+  assert.equal(ev("'scrubAt' in window.__o||'scrubTier' in window.__o"), false);
+  // New York and London over one transatlantic wave
+  ev("for(const c of ['nyc','lon']){ACT.buildPop({city:c});}for(const c of ['fra','nyc','lon'])S.pops[c].rgen=3;ACT.launchBB({city:'nyc'});S.pops.nyc.bb.d=150");
+  ev("ACT.buyTransit({city:'nyc',net:'cog',tier:2});ACT.buyTransit({city:'lon',net:'cog',tier:3});UI.via='grace';UI.route='same';openLinkModal('nyc','lon');ACT.buildLink({tier:3});closeModal()");
+  const tl = "S.links.find(l=>[l.a,l.b].includes('nyc')).id";
+  const atk = g => ev(`S.ev.ddos={city:'nyc',vec:'http',gbps:${g},until:S.day+3,entry:{k:'t',lab:'x'},bh:false,start:S.day-5};compute()`);
+  // build in two cities, one each; the bill adds up
+  ev("ACT.buildScrub({city:'fra',tier:1});ACT.buildScrub({city:'lon',tier:1});ACT.buildScrub({city:'lon',tier:2})");
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(S.scrubs.map(x=>x.city+':'+x.tier))")), ['fra:1', 'lon:1'], 'one center per city');
+  assert.equal(ev('scrubMo()'), 2 * ev('SCRUB_TIERS[1].mo'));
+  // Frankfurt has no backbone path from New York, so the flood goes to London, across the Atlantic
+  atk(0); const quiet = ev(`R.load[${tl}]||0`);
+  atk(600);
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(R.haul.map(q=>q.to))")), ['lon']);
+  assert.ok(ev('R.haul[0].h') > 590, 'all of it fits on the 800G wave');
+  assert.ok(ev('R.haul[0].ms') > 30 && ev('R.haul[0].ms') < 120, `a transatlantic detour (${ev('R.haul[0].ms').toFixed(0)} ms)`);
+  assert.ok(ev(`R.load[${tl}]`) > quiet + 500, 'the flood fills the transatlantic link');
+  assert.match(ev('ddosPanel()'), /hauled over your backbone/);
+  // a protected customer in New York minds the detour
+  ev("S.biz.push({id:'bs',city:'nyc',type:'scrub',bw:5,rate:900,mood:80,since:0,reqs:['scrubnear']})");
+  assert.match(ev("bizWhy(S.biz.find(b=>b.id==='bs')).join(' ')"), /hauled to London/);
+  assert.equal(ev("REQS.scrubnear.ok(S.biz.find(b=>b.id==='bs'))"), false, 'no center in the Americas yet');
+  // a center in New York cleans it on the spot: nothing crosses the ocean
+  ev("ACT.buildScrub({city:'nyc',tier:0})");atk(600);
+  assert.equal(ev("R.haul.filter(q=>q.to==='lon').length"), 1, '100G local, the rest spills to London');
+  assert.equal(ev("R.haul.some(q=>q.to==='nyc')"), false);
+  assert.ok(ev("REQS.scrubnear.ok(S.biz.find(b=>b.id==='bs'))"));
+  ev("S.scrubs.find(x=>x.city==='nyc').tier=1");atk(600);
+  assert.equal(ev('R.haul.length'), 0, 'a 1T center at home takes it all');
+  assert.ok(ev(`R.load[${tl}]||0`) < quiet + 50);
+  // over a thin link only part of it can be hauled; the rest is not scrubbed
+  ev("ACT.rmScrub({city:'nyc'});ACT.rmScrub({city:'nyc'})");
+  assert.equal(ev("S.scrubs.some(x=>x.city==='nyc')"), false, 'shut down after confirming');
+  ev(`S.links.find(l=>l.id===${tl}).tier=1`);atk(600);
+  assert.ok(ev('R.haul[0].h') < 120 && ev('R.haul[0].h') > 0, `the 100G wave caps the haul (${ev('R.haul[0].h').toFixed(0)})`);
+  assert.match(ev('ddosPanel()'), /can only haul/);
+  // the Infra tab says where attacks go from here
+  ev("ACT.selCity&&ACT.selCity({id:'nyc'});UI.sel={type:'city',id:'nyc'};UI.tab='infra';renderPanel()");
+  assert.match(dom.window.document.getElementById('panelBody').textContent, /nearest scrubbing center\. From here that is London/);
+  // closing a POP closes its center
+  ev("ACT.decomOpen({});ACT.decomToggle({city:'lon'});ACT.decomGo()");
+  assert.equal(ev("S.scrubs.some(x=>x.city==='lon')"), false);
   assert.deepEqual(errors, []);
 });

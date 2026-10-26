@@ -218,23 +218,36 @@ test('the map is not drawn while the dashboard covers the whole screen', () => {
   assert.deepEqual(errors, []);
 });
 
-// #89's fast paths must route exactly like the plain path. This builds a copy of compute() with every shortcut
-// turned off (the POP's-own-exits shortcut, the first-group scan with its list clean-up, the per-network exit index
-// and the full-path mark in push) and compares the two on a busy network, with Auto-TE and then with a RouteScript
-// that keeps headroom on every link, so it keeps holding when the game's numbers change.
-test('fast routing gives exactly the same result as the plain path it replaces', () => {
-  const { ev, errors } = load();
+// #89's fast paths must route exactly like the plain path. plainCompute() builds window.__plain, a copy of compute()
+// with every shortcut turned off (the POP's-own-exits shortcut, the first-group scan with its list clean-up, the
+// per-network exit index and the full-path mark), and the group split and sort written the plain way. The tests below
+// compare the two on a busy network (Auto-TE, then a RouteScript that keeps headroom on every link) and on a small one
+// where Auto-TE has to route around a full link, so it keeps holding when the game's numbers change.
+function plainCompute(ev) {
   const src = ev('compute.toString()');
-  const plain = src
+  let plain = src
     .replace('if(!lst.hi&&ALONE[f.ci])', 'if(false)')
     .replace('if(!G.length){\n        // One scan', 'if(false){\n        // One scan')
     .replace('for(const n of e.nets||NET_IDS)', 'for(const n of NET_IDS)')
-    .replace('if(P.dead)return 0;', '').replaceAll('if(r<=1e-6){P.dead=1;return 0;}', '');
+    .replace('if(P.dead)return 0;', '').replaceAll('if(r<=1e-6){P.dead=1;return 0;}', '')
+    .replace('if(!P.dead)room-=push(', 'room-=push(').replace(/const gone=e=>\{[^\n]*\};/, 'const gone=e=>false;');
+  // ...and the group split and sorting written the plain way, with array copies, as before they were made allocation-free
+  const sg = plain.indexOf('const ROOM=[],sendGroup='), sd = plain.indexOf('const sortD=');
+  assert.ok(sg > 0 && sd > sg, 'found the group sender and the sort');
+  plain = plain.slice(0, sg) + `const ROOM=[],sendGroup=(g0,i0=0,i1=g0.length)=>{const g=g0.slice(i0,i1);for(const e of g)e.vis=vis;
+    if(g.length>1){const room=g.map(e=>Math.max(0,e.cap-e.used)),tot=room.reduce((a,b)=>a+b,0),want=f.rem;if(tot>1e-6)g.forEach((e,k)=>send(e,want*room[k]/tot));}
+    for(const e of g){if(f.rem<=1e-6)break;send(e,f.rem);}};\n  ` + plain.slice(sd).replace(/^const sortD=a=>\{[^\n]*\};/, 'const sortD=a=>a.sort(byDist);');
   for (const [a, b] of [[src, plain]]) assert.notEqual(a, b);
   assert.equal((plain.match(/if\(false\)/g) || []).length, 2, 'both shortcuts were found and switched off');
   assert.ok(!plain.includes('e.nets||NET_IDS'), 'the exit index was switched off');
   assert.ok(!plain.includes('P.dead'), 'the full-path mark was switched off');
+  assert.ok(plain.includes('const sortD=a=>a.sort(byDist);') && plain.includes('g.forEach('), 'the plain group split and sort are in');
   ev('window.__plain=' + plain.replace(/^function compute/, 'function'));
+}
+
+test('fast routing gives exactly the same result as the plain path it replaces', () => {
+  const { ev, errors } = load();
+  plainCompute(ev);
   ev(`ACT.start({});S.cash=1e12;S.lvl=13;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});
     const cs=ALLC.filter(c=>!CITY[c].cn).slice(0,40);for(const c of cs){if(!S.pops[c])ACT.buildPop({city:c});S.pops[c].rgen=10;S.pops[c].routers=4;if(!S.pops[c].bb)ACT.launchBB({city:c});S.pops[c].bb.d=CITY[c].P*0.7;}
     const L=(a,b,t)=>{UI.via=null;UI.lmode='wave';UI.route='diverse';try{openLinkModal(a,b);ACT.buildLink({tier:t});closeModal();}catch(e){}};
@@ -259,5 +272,27 @@ test('fast routing gives exactly the same result as the plain path it replaces',
   }
   assert.ok(ev('S.pni.length') > 50 && ev('S.caches.length') > 50, 'a network big enough to exercise every path');
   assert.ok(ev('R.served') > 1000 && ev("S.transit.length") > 14, 'traffic flows over transit, peering and caches');
+  assert.deepEqual(errors, []);
+});
+
+test('Auto-TE routes around a full link exactly like the plain path', () => {
+  const { ev, errors } = load();
+  plainCompute(ev);
+  // Frankfurt reaches its only upstream in Amsterdam over a 10G wave, or the long way through Brussels on 800G.
+  ev(`ACT.start({});S.cash=1e12;S.lvl=13;for(const g of GOALS)S.done[g.id]=0;for(const c of ['ams','bru'])ACT.buildPop({city:c});
+    for(const c of ['fra','ams','bru']){S.pops[c].rgen=RG.length-1;S.pops[c].routers=RMAX;}if(!S.pops.fra.bb)ACT.launchBB({city:'fra'});S.pops.fra.bb.d=CITY.fra.P*0.8;
+    const L=(a,b,t)=>{UI.via=null;UI.lmode='wave';UI.route='main';openLinkModal(a,b);ACT.buildLink({tier:t});closeModal();};
+    L('fra','ams',0);L('fra','bru',3);L('bru','ams',3);
+    S.transit=[];const t=NETS.find(n=>n.price&&n.pops.includes('ams')&&n.type==='t1');ACT.buyTransit({city:'ams',net:t.id,tier:3});
+    S.ixp={};S.pni=[];S.caches=[];S.te={on:true,day:0};S.nextFail=1e9;S.nextEvent=1e9;`);
+  const sig = () => ev('JSON.stringify({served:R.served,teMoved:R.teMoved,egT:R.egT,load:S.links.map(l=>R.load[l.id]||0),node:R.nodeLoad,t:R.useT})');
+  for (const script of ['', 'spill at 70%']) {
+    ev(`S.te.script=${JSON.stringify(script)}`);
+    ev('compute()'); const fast = sig();
+    ev('__plain()'); const ref = sig();
+    assert.equal(fast, ref, `fast and plain route the same around the full link (${script || 'no script'})`);
+    assert.ok(ev('R.teMoved') > 100, 'Auto-TE moved traffic through Brussels');
+    assert.ok(ev("R.load[S.links.find(l=>l.a==='fra'&&l.b==='ams').id]") >= (script ? 6.9 : 9.99), 'the direct 10G link is full (up to the spill line)');
+  }
   assert.deepEqual(errors, []);
 });

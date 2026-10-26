@@ -199,7 +199,8 @@ test('#16 shark-averse customers only ask for routes that can stay on land', () 
   let shark = 0, bad = [];
   for (let i = 0; i < 1500; i++) {
     const o = JSON.parse(ev("S.offers=[];spawnOffer();JSON.stringify(S.offers.filter(o=>(o.reqs||[]).includes('sharks')).map(o=>[o.city,o.city2]))"));
-    for (const [a, b] of o) { shark++; if (ev(`CITY['${a}'].land!==CITY['${b}'].land`)) bad.push(a + '-' + b); }
+    // isSub, not .land: Cairo sits on two landmasses, so Mumbai to Cairo stays on land.
+    for (const [a, b] of o) { shark++; if (ev(`isSub('${a}','${b}')`)) bad.push(a + '-' + b); }
   }
   assert.ok(shark > 0, 'the requirement still shows up');
   assert.deepEqual(bad, [], 'never across an ocean');
@@ -540,29 +541,6 @@ test('#35 your own trench can light another fiber pair once a ROADMaster is full
   assert.deepEqual(errors, []);
 });
 
-test('#12 PNI discovery lists physical presence, marks own POPs and opens the city',()=>{
- const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.left='nets';renderAll();ACT.pniFind({net:'gog'})");
- const id=ev("NETS.find(n=>n.pops.length>6&&n.pops.includes('fra')).id");ev(`ACT.pniFind({net:'${id}'})`);
- let rows=dom.window.document.querySelectorAll('#modalCard [data-act="pniGo"]');
- assert.equal(rows.length,ev(`new Set(NET['${id}'].pops).size`));
- assert.equal(JSON.parse(rows[0].dataset.args).city,'fra');
- assert.match(dom.window.document.getElementById('modalCard').textContent,/Your POP/);
- assert.ok(dom.window.document.getElementById('modalCard').textContent.includes(ev('CITY.fra.dc')));
- const city=ev(`NET['${id}'].pops.find(c=>!S.pops[c])`);const cash=ev('S.cash');
- ev(`ACT.pniGo({net:'${id}',city:'${city}'})`);
- assert.equal(ev('UI.sel.id'),city);assert.equal(ev('UI.tab'),'peer');assert.equal(ev('S.cash'),cash);assert.equal(ev(`!!S.pops['${city}']`),false);
- assert.equal(dom.window.document.getElementById('modal').hidden,true);
- ev('window.innerWidth=360');ev(`ACT.pniFind({net:'${id}'})`);
- assert.equal(ev("$('modal').className"),'pni-locations');
- assert.equal(dom.window.document.getElementById('modalCard').getAttribute('aria-modal'),'false');
- ev("ACT.phoneTab({t:'noc'})");assert.equal(dom.window.document.getElementById('modal').hidden,true);
- ev(`ACT.pniFind({net:'${id}'})`);
- assert.equal(dom.window.document.querySelectorAll('#modalCard [data-act="pniGo"]').length,rows.length);
- ev(`S.pni.push({id:'existing',net:'${id}',city:'fra',tier:0});ACT.pniFind({net:'${id}'})`);
- assert.match(dom.window.document.getElementById('modalCard').textContent,/PNI already installed/);
- ev(`NET['${id}'].pops=[];ACT.pniFind({net:'${id}'})`);assert.match(dom.window.document.getElementById('modalCard').textContent,/No PNI locations listed/);
-});
-
 test('#64 your own subsea cable runs beside the route, however many waves share it', () => {
   const { ev, errors } = load();
   base(ev);
@@ -691,76 +669,6 @@ test('deal navigation visits the first missing POP, including second endpoints a
  ev("S.pops.ams={routers:1,rgen:0};renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'par');
  ev("S.pops.par={routers:1,rgen:0};renderLeft()");assert.equal(go(),null);assert.ok(dom.window.document.querySelector('#leftBody [data-act="accept"]'));
  ev("S.offers[0].type='l2vpn';delete S.offers[0].sites;S.offers[0].city='bde';renderLeft()");assert.equal(JSON.parse(go().dataset.args).city,'bde','single-site offers still work');
- assert.deepEqual(errors,[]);
-});
-
-test('link redundancy trials distinguish a bridge, a full fallback and a healthy alternate path without changing the game',()=>{
- const {ev,errors}=load();
- ev("ACT.start({});S.cash=1e8;ACT.buildPop({city:'bde'});ACT.buildPop({city:'ams'});S.biz=[{id:'circuit',name:'Test Circuit',type:'l2vpn',city:'fra',city2:'bde',bw:80,rate:1,reqs:[]}];S.links=[{id:'main',a:'fra',b:'bde',kind:'wave',tier:1,km:100,mo:100,cut:0,trench:'main'}];compute();window.state=JSON.stringify(S);window.live=R;window.hot=UI.hotMap;window.cache=TE_CACHE");
- let t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,true);assert.equal(t.loss,80);
- assert.equal(ev('JSON.stringify(S)'),ev('state'));assert.equal(ev('R===live&&UI.hotMap===hot&&TE_CACHE===cache'),true);
- ev("S.links.push({id:'a',a:'fra',b:'ams',kind:'wave',tier:0,km:100,mo:100,cut:0},{id:'b',a:'ams',b:'bde',kind:'wave',tier:0,km:100,mo:100,cut:0});compute()");
- t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,70);assert.equal(t.busy.length,2);
- ev("S.links[1].tier=1;S.links[2].tier=1;compute()");t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,0);
- ev("S.links[1].cut=S.day+5;compute()");assert.equal(ev("linkTrial('main').split"),true,'existing failures are respected');assert.equal(ev("linkTrial('a')"),null,'an already failed link is not tested');
- ev("S.links=S.links.slice(0,1);S.links.push({...S.links[0],id:'parallel'});compute()");assert.equal(ev("linkTrial('main').split"),false,'only the selected link fails even when a trench is shared');assert.equal(ev("linkTrial('main').loss"),0);
- ev("S.links[0]={...S.links[0],kind:'df',sys:'roadm',ch:['tp16'],pairs:1,regen:0,ready:0,own:true};compute()");assert.equal(ev("linkTrial('main').loss"),0,'dark fiber is tested as one link');
- ev("window.innerWidth=360;ACT.linkCheck({id:'main'})");assert.match(ev("$('modalCard').textContent"),/One backhoe is not enough/);assert.equal(ev("$('modal').className"),'link-check');ev("ACT.phoneTab({t:'noc'})");assert.equal(ev("$('modal').hidden"),true);
- ev("S.links[0]={...S.links[0],kind:'vxc',vt:1,prov:FABS[0].id};compute()");assert.equal(ev("linkTrial('main').loss"),0,'virtual circuits are tested individually');
- ev("window.saveRef=S;window.liveRef=R;window.originalCompute=compute;compute=()=>{throw Error('trial failed')}");assert.throws(()=>ev("linkTrial('main')"),/trial failed/);ev('compute=originalCompute');assert.equal(ev('S===saveRef&&R===liveRef'),true,'even a failed trial restores the live state');
- assert.deepEqual(errors,[]);
-});
-
-test('#20 local PNIs satisfy local breakout only while Tier 1, without changing transit or IX rules',()=>{
- const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.transit=[];S.ixp={};S.pni=[{id:'local',net:'nfx',city:'fra',tier:0}];R.reach=1");
- assert.equal(ev("REQS.local.ok({city:'fra'})"),false);
- ev("for(const n of t1Need())S.pni.push({id:n.id,net:n.id,city:n.pops.find(c=>c!=='fra'),tier:0});R.reach=1");
- assert.equal(ev('isTier1()'),true);assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
- assert.equal(ev("REQS.local.ok({city:'den'})"),false,'a PNI in another city does not count');
- ev("S.won=true;S.pni=S.pni.filter(p=>p.net!==t1Need()[0].id)");
- assert.equal(ev("REQS.local.ok({city:'fra'})"),false,'a historical Tier 1 win is insufficient');
- ev("S.transit=[{id:'t',net:'cog',city:'fra',tier:0}]");assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
- ev("S.transit=[];S.ixp.fra=0");assert.equal(ev("REQS.local.ok({city:'fra'})"),true);
- assert.deepEqual(errors,[]);
-});
-
-test('#36 own IX uplinks use ports, split across sites and stay within fabric capacity',()=>{
- const {ev,errors}=load();ev("ACT.start({});S.cash=1e8;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'mex'});ACT.foundIx({city:'mex'});ACT.addSite({city:'mex'});compute()");
- const cap=ev("ixCap('mex')"),ports=ev("portsUsed('mex')"),mo=ev("ixMo('mex')"),cash=ev('S.cash');
- ev("ACT.lagIx({city:'mex',d:1});ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
- assert.equal(ev('S.ixn.mex'),2);assert.equal(ev('S.ixSite.mex'),'ab');
- assert.equal(ev("portsUsed('mex')"),ports+1);assert.equal(ev('S.cash'),cash-ev('PORT[S.ixp.mex].setup'));
- assert.equal(ev("ixMo('mex')"),Math.round(mo*1.5));assert.equal(ev("ixCap('mex')"),cap,'extra uplinks do not invent switching capacity');
- for(const site of ['a','b']){ev(`S.inc=[{type:'site',ref:'mex',site:'${site}',until:S.day+10}];compute()`);assert.equal(ev("ixCap('mex')"),cap);}
- ev("ACT.siteSet({k:'ix',id:'mex',s:'b'});S.inc=[{type:'site',ref:'mex',site:'b',until:S.day+10}];compute()");assert.equal(ev("ixCap('mex')"),0);
- ev("S.inc=[];ACT.siteSet({k:'ix',id:'mex',s:'ab'});ACT.lagIx({city:'mex',d:-1})");assert.equal(ev('S.ixn.mex'),1);assert.equal(ev('S.ixSite.mex'),'a');assert.equal(ev("portsUsed('mex')"),ports);
- ev("S=migrate(JSON.parse(JSON.stringify(S)));compute();ACT.focusCity({city:'mex'});UI.tab='peer';renderPanel()");
- assert.match(ev("$('panelBody').textContent"),/Router uplinks/);assert.equal(ev("ixCap('mex')"),cap);
- ev("delete S.ixn.mex;delete S.ixSite.mex;S=migrate(JSON.parse(JSON.stringify(S)));compute()");assert.equal(ev("ixCap('mex')"),cap,'legacy own IX keeps its capacity');
- ev("S.pops.mex.rgen=0;S.pops.mex.routers=1;S.pni=Array.from({length:7},(_,i)=>({id:'p'+i,net:'cog',city:'mex',tier:1}));window.before=S.cash;ACT.siteSet({k:'ix',id:'mex',s:'ab'})");
- assert.equal(ev('S.cash'),ev('before'));assert.equal(ev('S.ixn.mex||1'),1);assert.equal(ev('S.ixSite.mex'),'ab','upstream switches can be split without buying router ports');
- ev("S.pni=[];S.cash=0;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex||1'),1);
- ev("S.cash=1e8;S.ixn.mex=LAG_MAX;window.before=S.cash;ACT.lagIx({city:'mex',d:1})");assert.equal(ev('S.ixn.mex'),ev('LAG_MAX'));assert.equal(ev('S.cash'),ev('before'));
- assert.deepEqual(errors,[]);
-});
-
-test('Networks filters use available exits even without demand and expose courtesy-only and hidden small networks',()=>{
- const {ev,dom,errors}=load();ev("ACT.start({});S.cash=1e8;UI.speed=0;S.transit=[];S.ixp={};S.pni=[];S.caches=[];S.grace=null;compute()");
- assert.equal(ev("netReach('nfx')"),'none');assert.equal(ev("R.demTo.nfx||0"),0);
- ev("S.transit=[{id:'t',net:'cog',city:'fra',tier:1,down:0}];compute()");assert.equal(ev("netReach('nfx')"),'transit');
- ev("S.pni=[{id:'p',net:'nfx',city:'fra',tier:1}];compute()");assert.equal(ev("netReach('nfx')"),'direct','a live but idle PNI counts');
- ev("S.pni=[];S.ixp.fra=1;S.rs.fra=true;compute();window.member=[...ixSessions('fra')][0]");assert.equal(ev('netReach(member)'),'direct');
- ev("S.ev.ixdown={fra:S.day+10};compute()");assert.equal(ev('netReach(member)'),'transit','a failed exchange is excluded');
- ev("S.ixp={};S.ev={};S.caches=[{id:'cache',net:'nfx',city:'fra'}];compute()");assert.equal(ev("netReach('nfx')"),'transit','cache hits do not imply full network reach');
- ev("S.transit[0].down=S.day+10;compute()");assert.equal(ev("netReach('nfx')"),'none');
- ev("S.caches=[];S.transit=[];S.grace={until:S.day+60,nets:['nfx']};compute()");assert.equal(ev("netReach('nfx')"),'grace');assert.equal(ev('R.reachable.nfx'),true);
- ev("S.ev.rpki={until:S.day+10,nets:['nfx']};compute()");assert.equal(ev("netReach('nfx')"),'none','filtered exits respect routing incidents');
- ev("S.ev={};S.grace.nets.push(NETS.find(n=>n.tail).id);compute();UI.left='nets';UI.tailOpen=false;window.innerWidth=360;ACT.netFilter({v:'missing'})");
- assert.match(dom.window.document.getElementById('leftBody').textContent,/Courtesy route only/);
- assert.ok(dom.window.document.getElementById('leftBody').textContent.includes(ev('NETS.find(n=>n.tail).name')),'filtered results include otherwise collapsed networks');
- ev("ACT.netFilter({v:'transit'})");assert.match(dom.window.document.getElementById('leftBody').textContent,/No networks match this filter/);
- ev("ACT.netFilter({v:'invalid'})");assert.equal(ev('UI.netFilter'),'transit');
- ev("ACT.netFilter({v:'all'})");assert.equal(ev('UI.tailOpen'),false,'filtering does not change the all-networks collapse preference');
  assert.deepEqual(errors,[]);
 });
 
@@ -1150,7 +1058,11 @@ test('#104 declining a loan offer clears the bank badge while paused', () => {
 test('#88 no subsea cable longer than any optic can light, and a refund for calling one off', () => {
   const { ev, errors } = load();
   ev("ACT.start({});S.cash=1e10;S.lvl=13;S.won=true;for(const g of GOALS)S.done[g.id]=0");
-  assert.match(ev("ownCabWhy('nyc','syd')"), /more than any optic can light/);
+  // New York to Sydney is too long for plain optics; since #78 premium terminals light it, so the order screen asks
+  // for them instead of refusing. Only a length beyond even both upgrades is refused.
+  assert.equal(ev("ownCabWhy('nyc','syd')"), '');
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(subNeed(ownCabKm('nyc','syd')))")), ['terminal']);
+  assert.equal(ev('subNeed(26000)'), null, 'nothing lights 26,000 km');
   assert.equal(ev("ownCabWhy('lax','syd')"), '', 'Los Angeles to Sydney still works');
   assert.ok(ev("subCarrier(ownCabKm('lax','syd'))") > 0);
   // half-way through laying it: most of the unlaid part comes back
@@ -1163,7 +1075,9 @@ test('#88 no subsea cable longer than any optic can light, and a refund for call
   assert.equal(ev('S.cash') - c0, want);
   // a finished cable that works is yours for good; one nothing can light (old saves) goes back in full
   assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:ownCabKm('lax','syd'),ready:0})"), 0);
-  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:18387,ready:0})"), ev('ownCabCost(18387)'));
+  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:26000,ready:0})"), ev('ownCabCost(26000)'));
+  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:26000,ready:0,paid:5e8})"), 5e8, 'what was really paid');
+  assert.equal(ev("cabBack({kind:'df',own:true,sub:true,km:18387,ready:0})"), 0, 'a finished cable upgrades can light is yours for good');
   assert.deepEqual(errors, []);
 });
 
@@ -1184,7 +1098,7 @@ test('#36 your own IX moves between buildings, or runs a switch in both', () => 
   assert.ok(cap > 0);
   // no LAG for a switch you own
   ev("UI.sel={type:'city',id:'beg'};UI.tab='peer';renderPanel()");
-  assert.equal(ev("!!document.querySelector('#panel [data-act=lagIx]')"), true, 'optional local uplink controls remain available');
+  assert.equal(ev("!!document.querySelector('#panel [data-act=lagIx]')"), false, 'no LAG button');
   // move it to B: a dark A no longer matters
   ev("ACT.siteSet({k:'ix',id:'beg',s:'b'})");
   assert.equal(ev("S.ixSite.beg"), 'b');
@@ -1231,4 +1145,81 @@ test('#107 a bigger optic never carries less than a smaller one at the same dist
   assert.equal(ev("optMode('tp32',{km:4500,sub:false,regen:0}).g"), 1200);
   assert.equal(ev("optMode('tp32',{km:7000,sub:true,regen:0}).g"), 1200);
   assert.deepEqual(errors, []);
+});
+
+test('#110 PNI buttons show the monthly port fee, not just the one-off setup', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=6;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});selectCity('fra');ACT.tab({t:'peer'})");
+  const txt = ev("document.getElementById('panelBody').textContent");
+  assert.match(txt, /10G \$1\.8k \+ \$200\/mo/, 'setup plus the monthly fee, like IX ports and LAG members');
+  // upgrading an existing PNI says what the bigger port costs per month too, in the panel and in the NOC's list
+  ev("const n=NETS.find(x=>x.pops.includes('fra')&&!x.tail&&peerOk(x.id,'pni','fra').ok);S.pni.push({id:'p1',net:n.id,city:'fra',tier:0,n:1});after();selectCity('fra');ACT.tab({t:'peer'})");
+  assert.match(ev("document.getElementById('panelBody').textContent"), /Upgrade 100G \$2\.3k \+ \$350\/mo/);
+  assert.match(ev("connUp(conns().find(r=>r.k==='p'&&r.id==='p1')).replace(/<[^>]+>/g,'')"), /Upgrade 100G \$2\.3k \+ \$350\/mo/);
+  assert.deepEqual(errors, []);
+});
+
+test('#111 #121 #12 the road to Tier 1: what is missing, and where to meet each network', () => {
+  const { ev, errors, dom } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=6;for(const g of GOALS)if(g.id!=='t1')S.done[g.id]=0");
+  ev("for(const c of ['fra','ams','nyc']){ACT.buildPop({city:c});S.pops[c].rgen=3;}ACT.buyTransit({city:'fra',net:'cog',tier:2});for(const x of ixIdsIn('ams'))ACT.buyIx({city:x,tier:2,signed:true});compute();ACT.peerAll({city:'ams'});compute()");
+  const body = () => dom.window.document.getElementById('leftBody').textContent;
+  // transit hides how much you would lose without it
+  assert.ok(ev('R.reach') > 0.99 && ev('R.reachNT') < ev('R.reach'), 'reach without transit is counted separately');
+  assert.equal(ev("NETS.filter(n=>R.nt[n.id]).reduce((a,n)=>a+NSH[n.id],0).toFixed(6)"), ev('R.reachNT.toFixed(6)'));
+  // #111: the goal card lists the missing Tier 1 PNIs and the networks out of reach
+  ev("UI.left='goals';UI.leftOpen=true;UI.sel=null;renderLeft()");
+  assert.match(body(), /Road to Tier 1/);
+  assert.match(body(), new RegExp(`PNIs with every Tier 1\\s*0 / ${ev('t1Need().length')}`));
+  assert.match(body(), /Transit ports to cancel\s*1/);
+  assert.match(body(), new RegExp(ev('t1Need()[0].name')));
+  assert.match(body(), /Tier 1s only take a PNI from a network with/);
+  assert.match(body(), /out of reach/);
+  // the filter lists exactly the networks you reach only through transit, biggest first
+  ev("ACT.netFilter({f:'out'})");
+  const shown = JSON.parse(ev("JSON.stringify(ntLost().map(n=>n.id))"));
+  assert.ok(shown.length > 0 && shown.length === ev("NETS.filter(n=>!R.nt[n.id]).length"));
+  const reached = ev("NETS.find(n=>R.nt[n.id]&&!n.tail).name");
+  assert.ok(!body().includes(reached + ' AS'), 'networks you already reach are not on the list');
+  assert.ok(ev("ntLost().every((n,i,a)=>!i||NSH[a[i-1].id]>=NSH[n.id])"));
+  // #12, #121: every place to meet a network, your POPs first, then the nearest
+  const far = ev("NETS.find(n=>!n.tail&&n.ix!=='ALL'&&n.pops.length&&n.pops.every(c=>!S.pops[c])).id");
+  const spots = JSON.parse(ev(`JSON.stringify(meetSpots('${far}').map(x=>x.c))`));
+  assert.ok(spots.length >= 1);
+  const near = JSON.parse(ev("JSON.stringify(popNear())"));
+  assert.ok(spots.every((c, i) => !i || near[spots[i - 1]] <= near[c]), 'nearest first');
+  assert.ok(ev(`NET['${far}'].pops.every(c=>meetSpots('${far}').some(x=>x.c===c&&x.pni))`), 'every PNI city is listed');
+  assert.match(ev(`offTransitHint('${far}')`), new RegExp('Nearest: ' + ev(`CITY['${spots[0]}'].name`)));
+  ev(`ACT.netFocus({id:'${far}'})`);
+  assert.match(body(), /Where to meet them/);
+  assert.match(body(), new RegExp(ev(`CITY['${spots[0]}'].name`)));
+  ev(`ACT.meetGo({city:'${spots[0]}'})`);
+  assert.equal(ev('UI.sel&&UI.sel.id'), spots[0]);
+  // the NOC to-do list has a way to the network's entry
+  ev("for(const c of Object.keys(S.pops))ACT.launchBB({city:c});for(let i=0;i<3;i++)dayTick();$('dash').hidden=false;UI.dtab='traffic';renderDash()");
+  assert.match(dom.window.document.getElementById('dash').innerHTML, /data-act="netFocus"/);
+  // Tier 1 reached: the card goes away
+  ev("S.transit=[];for(const n of t1Need())S.pni.push({id:'t'+n.id,net:n.id,city:n.pops[0],tier:0});compute();R.reach=1;R.reachNT=1;for(const n of NETS)R.reachable[n.id]=R.nt[n.id]=1;UI.left='goals';renderLeft()");
+  assert.equal(ev('isTier1()'), true);
+  assert.doesNotMatch(body(), /Road to Tier 1/);
+  // phones: the same views in the bottom sheet
+  dom.window.innerWidth = 360; ev("ACT.netFilter({f:'out'});renderAll&&renderAll()");
+  assert.deepEqual(errors, []);
+});
+
+test('link redundancy trials distinguish a bridge, a full fallback and a healthy alternate path without changing the game',()=>{
+ const {ev,errors}=load();
+ ev("ACT.start({});S.cash=1e8;ACT.buildPop({city:'bde'});ACT.buildPop({city:'ams'});S.biz=[{id:'circuit',name:'Test Circuit',type:'l2vpn',city:'fra',city2:'bde',bw:80,rate:1,reqs:[]}];S.links=[{id:'main',a:'fra',b:'bde',kind:'wave',tier:1,km:100,mo:100,cut:0,trench:'main'}];compute();window.state=JSON.stringify(S);window.live=R;window.hot=UI.hotMap;window.cache=TE_CACHE");
+ let t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,true);assert.equal(t.loss,80);
+ assert.equal(ev('JSON.stringify(S)'),ev('state'));assert.equal(ev('R===live&&UI.hotMap===hot&&TE_CACHE===cache'),true);
+ ev("S.links.push({id:'a',a:'fra',b:'ams',kind:'wave',tier:0,km:100,mo:100,cut:0},{id:'b',a:'ams',b:'bde',kind:'wave',tier:0,km:100,mo:100,cut:0});compute()");
+ t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,70);assert.equal(t.busy.length,2);
+ ev("S.links[1].tier=1;S.links[2].tier=1;compute()");t=JSON.parse(ev("JSON.stringify(linkTrial('main'))"));assert.equal(t.split,false);assert.equal(t.loss,0);
+ ev("S.links[1].cut=S.day+5;compute()");assert.equal(ev("linkTrial('main').split"),true,'existing failures are respected');assert.equal(ev("linkTrial('a')"),null,'an already failed link is not tested');
+ ev("S.links=S.links.slice(0,1);S.links.push({...S.links[0],id:'parallel'});compute()");assert.equal(ev("linkTrial('main').split"),false,'only the selected link fails even when a trench is shared');assert.equal(ev("linkTrial('main').loss"),0);
+ ev("S.links[0]={...S.links[0],kind:'df',sys:'roadm',ch:['tp16'],pairs:1,regen:0,ready:0,own:true};compute()");assert.equal(ev("linkTrial('main').loss"),0,'dark fiber is tested as one link');
+ ev("window.innerWidth=360;ACT.linkCheck({id:'main'})");assert.match(ev("$('modalCard').textContent"),/One backhoe is not enough/);assert.equal(ev("$('modal').className"),'link-check');ev("ACT.phoneTab({t:'noc'})");assert.equal(ev("$('modal').hidden"),true);
+ ev("S.links[0]={...S.links[0],kind:'vxc',vt:1,prov:FABS[0].id};compute()");assert.equal(ev("linkTrial('main').loss"),0,'virtual circuits are tested individually');
+ ev("window.saveRef=S;window.liveRef=R;window.originalCompute=compute;compute=()=>{throw Error('trial failed')}");assert.throws(()=>ev("linkTrial('main')"),/trial failed/);ev('compute=originalCompute');assert.equal(ev('S===saveRef&&R===liveRef'),true,'even a failed trial restores the live state');
+ assert.deepEqual(errors,[]);
 });

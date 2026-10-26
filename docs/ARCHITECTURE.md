@@ -34,6 +34,7 @@ Other files:
 | --- | --- |
 | `site/i18n/it.js` | Italian dictionary: English text → Italian, loaded when the language is `it` |
 | `site/i18n/pt.js` | Portuguese (Brazil) dictionary: English text → Portuguese, loaded when the language is `pt` |
+| `site/i18n/fr.js` | French dictionary: English text → French, loaded when the language is `fr` |
 | `site/sw.js` | Service worker: network-first for pages, stale-while-revalidate for assets. Cache name is stamped with the version |
 | `site/site.webmanifest`, icons | PWA install metadata |
 | `scripts/build.sh` | Copies `site/` to `_site/`, stamps `__VERSION__`/`__BUILD_DATE__`, bakes release notes, writes `version.json` |
