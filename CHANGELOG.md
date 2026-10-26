@@ -6,44 +6,12 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
-## [1.29.0-qol.3] — 2026-10-26
+## [1.29.0-qol.4] — 2026-10-26
 
-- Sound resumes after browser or app interruptions on your next interaction. Turning sound on plays a short confirmation tone.
-
-## [1.29.0-qol.2] — 2026-10-26
-
-- Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements.
+- Synced upstream main (2c0d693), including unreleased changes, while retaining the fork’s QoL improvements.
 
 
-## [1.29.0-qol.1] — 2026-10-26
-
-- Updated to upstream 1.29.0 and latest fixes, preserving local QoL tools and adapting reach filters to optimized routing. Own-IX site resilience now follows upstream switch placement and operating costs; optional router uplinks remain available.
-
-## [1.28.0-qol.3] — 2026-10-25
-
-- Updated to the latest upstream router trade-ins, daily swap limit, speed-based requirements and gentler link bends. Local QoL improvements remain included.
-
-## [1.28.0-qol.2] — 2026-10-25
-
-- Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included.
-
-## [1.28.0-qol.1] — 2026-10-25
-
-- Updated to upstream 1.28.0 with the new Benelux cities and networks, retaining all local QoL improvements.
-
-## [1.27.0-qol.2] — 2026-10-25
-
-- Updated to the latest upstream changes: incident-first NOC, caches across metro sites, Russian video demand correction, four North American cities, precise Tier 1 reach hints and waves joining existing routes. Local QoL improvements remain included.
-
-## [1.27.0-qol.1] — 2026-10-25
-
-- Updated to upstream 1.27.0, including the mobile NOC navigation fix, while retaining the local PNI finder, own-IX uplinks, PWA display fix, link redundancy checks and network reach filters.
-
-## [1.25.2-qol.1] — 2026-10-25
-
-- Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
-
-
+- Big networks are snappier again: working out each day's traffic takes about a quarter less time in the browser, so game days and clicks pause for less on phones. Traffic goes exactly where it went before.
 - Your own subsea cable can no longer be longer than any optic can light (#88). New York to Sydney now says so before you pay, instead of after the ship comes home. Calling off a cable while it is still being laid returns most of the price of the part not laid yet, and an unusable cable from an older save goes back for a full refund.
 - Your own IX can now live in either building of a two-site metro, or in both with a second switch, so a dark building no longer takes your exchange down (#36). The LAG buttons that did nothing on your own IX are gone.
 - Upgrading the only router in a POP that has nothing plugged in yet no longer opens a maintenance window or a NOC warning (#105).
@@ -699,3 +667,48 @@ First public release.
 - Dozens of failure types and geopolitical events, a NOC with an event log, and
   a NOC dashboard with traffic, money and per-ASN graphs.
 - Cookieless Ridiculytics analytics on the live site only.
+
+## [1.29.0-qol.3] — 2026-10-26
+
+- Sound resumes after browser or app interruptions on your next interaction. Turning sound on plays a short confirmation tone.
+
+## [1.29.0-qol.2] — 2026-10-26
+
+- Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements.
+
+## [1.29.0-qol.1] — 2026-10-26
+
+- Updated to upstream 1.29.0 and latest fixes, preserving local QoL tools and adapting reach filters to optimized routing. Own-IX site resilience now follows upstream switch placement and operating costs; optional router uplinks remain available.
+
+## [1.28.0-qol.3] — 2026-10-25
+
+- Updated to the latest upstream router trade-ins, daily swap limit, speed-based requirements and gentler link bends. Local QoL improvements remain included.
+
+## [1.28.0-qol.2] — 2026-10-25
+
+- Updated to the latest upstream map changes: Hamburg and Munich with Brezn-IX, plus corrected Frankfurt and Stuttgart positions. Local QoL improvements remain included.
+
+## [1.28.0-qol.1] — 2026-10-25
+
+- Updated to upstream 1.28.0 with the new Benelux cities and networks, retaining all local QoL improvements.
+
+## [1.27.0-qol.2] — 2026-10-25
+
+- Updated to the latest upstream changes: incident-first NOC, caches across metro sites, Russian video demand correction, four North American cities, precise Tier 1 reach hints and waves joining existing routes. Local QoL improvements remain included.
+
+## [1.27.0-qol.1] — 2026-10-25
+
+- Updated to upstream 1.27.0, including the mobile NOC navigation fix, while retaining the local PNI finder, own-IX uplinks, PWA display fix, link redundancy checks and network reach filters.
+
+## [1.25.2-qol.1] — 2026-10-25
+
+- Filter Networks by missing routes or transit-only reach, including idle and small networks. Temporary courtesy routes are flagged so new networks do not hide behind update grace.
+
+
+- Your own subsea cable can no longer be longer than any optic can light (#88). New York to Sydney now says so before you pay, instead of after the ship comes home. Calling off a cable while it is still being laid returns most of the price of the part not laid yet, and an unusable cable from an older save goes back for a full refund.
+- Your own IX can now live in either building of a two-site metro, or in both with a second switch, so a dark building no longer takes your exchange down (#36). The LAG buttons that did nothing on your own IX are gone.
+- Upgrading the only router in a POP that has nothing plugged in yet no longer opens a maintenance window or a NOC warning (#105).
+- Declining a loan offer clears the bank badge right away, even while the game is paused (#104).
+- The 3.2T transponder now falls back to 1.2T between 4,000 and 5,500 km (6,000 to 8,250 km subsea), like the 1.6T one, instead of dropping to 800G (#107). A bigger optic now carries at least as much as a smaller one at every distance.
+- Parallel waves of different sizes now show each size on the map, like 800G + 400G, instead of a misleading 2 × 1.2T (#56).
+- Picking a subsea route from a city without a cable landing, like Oslo, now names the nearest landing station instead of saying its cables reach "nowhere" (#50).

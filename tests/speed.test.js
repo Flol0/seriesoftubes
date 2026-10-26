@@ -219,18 +219,21 @@ test('the map is not drawn while the dashboard covers the whole screen', () => {
 });
 
 // #89's fast paths must route exactly like the plain path. This builds a copy of compute() with every shortcut
-// turned off (the POP's-own-exits shortcut, the first-group scan and the per-network exit index) and compares the
-// two on a busy network, so it keeps holding when the game's numbers change.
+// turned off (the POP's-own-exits shortcut, the first-group scan with its list clean-up, the per-network exit index
+// and the full-path mark in push) and compares the two on a busy network, with Auto-TE and then with a RouteScript
+// that keeps headroom on every link, so it keeps holding when the game's numbers change.
 test('fast routing gives exactly the same result as the plain path it replaces', () => {
   const { ev, errors } = load();
   const src = ev('compute.toString()');
   const plain = src
     .replace('if(!lst.hi&&ALONE[f.ci])', 'if(false)')
-    .replace('if(!G.length){\n        let bh=2', 'if(false){\n        let bh=2')
-    .replace('for(const n of e.nets||NET_IDS)', 'for(const n of NET_IDS)');
+    .replace('if(!G.length){\n        // One scan', 'if(false){\n        // One scan')
+    .replace('for(const n of e.nets||NET_IDS)', 'for(const n of NET_IDS)')
+    .replace('if(P.dead)return 0;', '').replaceAll('if(r<=1e-6){P.dead=1;return 0;}', '');
   for (const [a, b] of [[src, plain]]) assert.notEqual(a, b);
   assert.equal((plain.match(/if\(false\)/g) || []).length, 2, 'both shortcuts were found and switched off');
   assert.ok(!plain.includes('e.nets||NET_IDS'), 'the exit index was switched off');
+  assert.ok(!plain.includes('P.dead'), 'the full-path mark was switched off');
   ev('window.__plain=' + plain.replace(/^function compute/, 'function'));
   ev(`ACT.start({});S.cash=1e12;S.lvl=13;S.won=true;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});
     const cs=ALLC.filter(c=>!CITY[c].cn).slice(0,40);for(const c of cs){if(!S.pops[c])ACT.buildPop({city:c});S.pops[c].rgen=10;S.pops[c].routers=4;if(!S.pops[c].bb)ACT.launchBB({city:c});S.pops[c].bb.d=CITY[c].P*0.7;}
@@ -245,7 +248,10 @@ test('fast routing gives exactly the same result as the plain path it replaces',
   const sig = () => ev(`JSON.stringify({served:R.served,demand:R.demand,reach:R.reach,peered:R.peered,teMoved:R.teMoved,egT:R.egT,
     srv:Object.keys(R.citySrv).sort().map(c=>[c,R.citySrv[c]]),load:S.links.map(l=>R.load[l.id]||0),node:Object.keys(R.nodeLoad).sort().map(c=>[c,R.nodeLoad[c]]),
     t:Object.keys(R.useT).sort().map(k=>[k,R.useT[k]]),p:Object.keys(R.usePni).sort().map(k=>[k,R.usePni[k]]),ix:Object.keys(R.useIx).sort().map(k=>[k,R.useIx[k]]),c:Object.keys(R.useCache).sort().map(k=>[k,R.useCache[k]])})`);
-  for (let day = 0; day < 4; day++) {
+  for (let day = 0; day < 6; day++) {
+    // the last days run a RouteScript: spill keeps headroom on every link (push with a reserve), plus preferences
+    if (day === 4) ev(`S.te.script='spill at 80%\\nprefer transit '+NET[S.transit[0].net].name+'\\nprotect customers';`);
+    if (day >= 4) assert.ok(ev('!!teRules()&&teRules().spill===0.8'), 'the RouteScript is active');
     ev('compute()'); const fast = sig();
     ev('__plain()'); const ref = sig();
     assert.equal(fast, ref, `day ${day}: the fast and the plain path route the same traffic`);
