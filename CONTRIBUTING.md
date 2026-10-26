@@ -44,7 +44,8 @@ A tour of the code is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
   Releases are cut by the maintainer.
 - Show the performance of changes to `site/` on a big network. The Performance check posts a table
   comparing your PR with `main` as a comment; to run it yourself:
-  `git show origin/main:site/index.html > /tmp/base.html && npm run perf -- --base /tmp/base.html`.
+  `git show origin/main:site/index.html > /tmp/base.html && npm run perf -- --base /tmp/base.html`
+  (add `--browser` to also time it in Chromium as a desktop and a phone, like CI does).
   Anything marked slower needs an explanation.
 - Old saves must keep loading. New state needs a default for new games and a check in
   `sanitize()`.

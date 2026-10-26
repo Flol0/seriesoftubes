@@ -1,6 +1,6 @@
 {
   "name": "seriesoftubes",
-  "version": "1.29.0-qol.1",
+  "version": "1.29.0-qol.2",
   "description": "A cartoon browser game about building the internet.",
   "private": true,
   "license": "MIT",
@@ -10,7 +10,7 @@
     "url": "git+https://github.com/fjaeckel/seriesoftubes.git"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/game.test.js tests/build.test.js tests/persist.test.js tests/services.test.js tests/peering.test.js tests/issues.test.js tests/regions.test.js tests/modes.test.js tests/levels.test.js tests/speed.test.js tests/i18n.test.js tests/routing-reference.test.js",
+    "test": "node --test --test-concurrency=1 tests/game.test.js tests/build.test.js tests/persist.test.js tests/services.test.js tests/peering.test.js tests/issues.test.js tests/regions.test.js tests/modes.test.js tests/levels.test.js tests/speed.test.js tests/i18n.test.js tests/routing-reference.test.js tests/perf.test.js",
     "build": "bash scripts/build.sh",
     "i18n:check": "node scripts/i18n-check.js",
     "serve": "npm run build && npx --yes serve@14.2.4 _site",
@@ -20,6 +20,7 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "jsdom": "24.1.3"
+    "jsdom": "24.1.3",
+    "playwright-core": "1.56.0"
   }
 }

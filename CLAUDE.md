@@ -18,6 +18,7 @@ node scripts/i18n-check.js   # must report "0 missing, 0 unused, 0 broken"
 npm run build                # builds _site/ (stamps version, bakes release notes)
 npm run serve                # build and serve locally
 npm run perf -- --base /tmp/base.html   # big-network benchmark vs another version (see `performance`)
+npm run perf -- --base /tmp/base.html --browser   # the same, also in real Chromium (desktop and phone)
 ```
 
 To play during development, open `site/index.html` directly or run `npm run serve`.

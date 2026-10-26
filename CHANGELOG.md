@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.29.0-qol.2] — 2026-10-26
+
+- Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements.
+
+
 ## [1.29.0-qol.1] — 2026-10-26
 
 - Updated to upstream 1.29.0 and latest fixes, preserving local QoL tools and adapting reach filters to optimized routing. Own-IX site resilience now follows upstream switch placement and operating costs; optional router uplinks remain available.

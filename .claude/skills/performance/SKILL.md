@@ -14,12 +14,28 @@ have huge late-game networks, and most of them are on phones.
 
 ```bash
 git show origin/main:site/index.html > /tmp/base.html
-npm run perf -- --base /tmp/base.html          # about a minute
+npm run perf -- --base /tmp/base.html            # headless only, a few minutes
+npm run perf -- --base /tmp/base.html --browser  # plus real Chromium, desktop and phone (what CI runs)
 ```
 
 `scripts/perf-bench.js` loads `tests/fixtures/big-network.json` (about 100 POPs, 150 links,
-950 PNIs, 830 cache boxes, 110 IX ports, 170 customers) into the base and into this checkout, in
-one process, and times them in alternating turns. It prints a Markdown table (median of 7 runs):
+950 PNIs, 830 cache boxes, 110 IX ports, 170 customers) into the base and into this checkout and
+times them in alternating turns, 15 runs each. It prints one table per environment:
+
+- **Headless (jsdom):** our JavaScript. The most stable numbers for routing and simulation, but jsdom's
+  DOM is about 30× slower than a browser's and it has no layout, so its panel and dashboard rows say
+  little about what players feel.
+- **Chromium, desktop** and **Chromium, phone** (`--browser`, `scripts/perf-browser.js`): the real DOM,
+  layout and canvas. The phone is 390×844 at 3× pixel density with the CPU slowed down 4×, about a
+  mid-range Android. Each version runs in its own browser. Use these rows for anything in the interface,
+  and to catch forced layouts (reading `scrollTop`, `offsetHeight` and friends right after changing the
+  DOM), which jsdom cannot see at all.
+  Browsers leave layout and canvas drawing for the next frame, so each timed run ends by forcing both;
+  without that, DOM and map work would look free. For the same reason, a profile that puts a lot of
+  time on a line reading `scrollTop` is usually showing layout that has to happen anyway, not waste:
+  check with the benchmark before "fixing" it.
+
+Each table has these rows:
 
 - Routing: `compute()`
 - One game day: `dayTick()`
@@ -28,7 +44,11 @@ one process, and times them in alternating turns. It prints a Markdown table (me
 - NOC dashboard tabs
 - Map at three zoom levels
 
-and says whether both versions route the save's traffic identically.
+and it says whether both versions route the save's traffic identically.
+
+`--browser` needs Chromium: a local `playwright` with its browser works as is; otherwise
+`playwright-core` (a dev dependency, installed by `npm ci`) drives the Chrome in `PERF_CHROME` or
+`--chrome PATH`. CI uses the Chrome that ships with GitHub's Ubuntu runners.
 
 Without `--base` it just times this checkout. `--runs N`, `--md FILE`, `--json FILE` and
 `--summary FILE` are there for CI and for digging.
@@ -57,15 +77,21 @@ incidents and failures).
 
 ## Read the table
 
-- Below about 2 ms, differences are noise. The verdicts already ignore them.
-- A busy machine can swing a single row by ±20% on identical code. When a verdict looks surprising
-  for what the change touches, rerun with `--runs 15` before reporting it, and report both runs.
+- Shared machines (CI runners, cloud sandboxes) swing a single run by ±30% on identical code, and no
+  timing method gets around it: CPU time is as noisy as wall time there. So a row only gets a verdict
+  when it moved by 15% or more **and** the samples say it is real: p < 0.01 in a Mann–Whitney U test
+  (`scripts/perf-stats.js`), and more than 2 ms (8 ms on the phone). Otherwise it shows ≈, whatever
+  the percentage. The `p` column says how sure each row is.
+- A big percentage with ≈ means "could be noise". If it matters for the change, run again (or with
+  `--runs 25`) and report both runs; do not report a single noisy number as a finding.
 - ⚠️ slower (15% or more) or 🔴 slower (50% or more) needs a reason in the PR, or a fix. A new
   feature may cost time; a refactor or a fix should not.
 - "Routing results differ" is expected when a change is meant to change gameplay (new cities,
   balance, routing rules), and a bug when it only promises to be faster.
-- It is headless (jsdom with a recording canvas): it measures our JavaScript, not the browser's
-  painting. For drawing changes, also look at the game on a phone.
+- Headless Chromium draws the canvas in software, real phones usually on the GPU, so map rows in the
+  Chromium tables overstate drawing cost. For drawing changes, also look at the game on a phone.
+- Absolute numbers depend on the machine. Compare base and head from the same run, never numbers
+  from different runs or machines.
 
 ## Keeping the fixture useful
 

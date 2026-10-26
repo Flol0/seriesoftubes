@@ -38,7 +38,7 @@ Other files:
 | `site/site.webmanifest`, icons | PWA install metadata |
 | `scripts/build.sh` | Copies `site/` to `_site/`, stamps `__VERSION__`/`__BUILD_DATE__`, bakes release notes, writes `version.json` |
 | `scripts/release-notes.js` | Extracts a version's CHANGELOG bullets |
-| `scripts/perf-bench.js`, `scripts/perf-fixture.js` | Big-network benchmark (base vs head, posted on every PR by `perf.yml` + `perf-comment.yml`) and the generator of its save, `tests/fixtures/big-network.json` |
+| `scripts/perf-bench.js`, `scripts/perf-browser.js`, `scripts/perf-stats.js`, `scripts/perf-fixture.js` | Big-network benchmark, base vs head, headless and in Chromium as a desktop and a throttled phone, with a significance test per row (posted on every PR by `perf.yml` + `perf-comment.yml`), and the generator of its save, `tests/fixtures/big-network.json` |
 | `scripts/i18n-check.js` | Compares every `tr`/`trn`/`N_` literal and `data-i18n` text with each dictionary |
 | `tests/harness.js` | Loads the page in jsdom with a seeded `Math.random` and a fake canvas |
 | `.github/workflows/ci.yml` | Tests and build on every push and PR |
