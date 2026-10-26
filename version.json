@@ -1,7 +1,7 @@
 {
-  "version": "1.29.0-qol.1",
+  "version": "1.29.0-qol.2",
   "date": "2026-10-26",
   "notes": [
-    "Updated to upstream 1.29.0 and latest fixes, preserving local QoL tools and adapting reach filters to optimized routing. Own-IX site resilience now follows upstream switch placement and operating costs; optional router uplinks remain available."
+    "Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements."
   ]
 }
