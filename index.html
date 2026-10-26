@@ -18,7 +18,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="generator" content="Series of Tubes 1.29.0-qol.2">
+<meta name="generator" content="Series of Tubes 1.29.0-qol.4">
 <link rel="canonical" href="https://seriesoftub.es/">
 
 <!-- Open Graph -->
@@ -79,7 +79,7 @@
   "playMode": "SinglePlayer",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "softwareVersion": "1.29.0-qol.2",
+  "softwareVersion": "1.29.0-qol.4",
   "dateModified": "2026-10-26",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Frederic Jung", "url": "https://github.com/fjaeckel" }
@@ -556,7 +556,7 @@ button,.chip,.b,a{touch-action:manipulation;-webkit-tap-highlight-color:transpar
 // Language: the player's saved choice, else the browser's, else English. Non-English dictionaries load before the game.
 (function(){const langs=window.SOT_LANGS={en:'English',it:'Italiano',pt:'Português'};let l=null;try{l=localStorage.getItem('sot-lang');}catch(e){}
   const b=(navigator.language||'').slice(0,2).toLowerCase();if(!Object.hasOwn(langs,l))l=Object.hasOwn(langs,b)?b:'en';
-  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.29.0-qol.2"><\/script>');})();
+  window.SOT_LANG=l;document.documentElement.lang=l;if(l!=='en')document.write('<script src="i18n/'+l+'.js?v=1.29.0-qol.4"><\/script>');})();
 </script>
 <script>
 'use strict';
@@ -574,9 +574,9 @@ function N_(s){return s;}
 /* ================= ANALYTICS (ridiculytics) =================
    Off unless ANALYTICS.host is set. Fill in your collector when you self-host the game.
    Inside the claude.ai viewer outside requests are blocked, so it only reports from your own domain. */
-const APP_VERSION='1.29.0-qol.2';
+const APP_VERSION='1.29.0-qol.4';
 // Filled in by scripts/build.sh from CHANGELOG.md for this version.
-const RELEASE_NOTES=["Synced upstream main (c76dd4d), including unreleased changes, while retaining the fork’s QoL improvements."];
+const RELEASE_NOTES=["Synced upstream main (2c0d693), including unreleased changes, while retaining the fork’s QoL improvements.","Big networks are snappier again: working out each day's traffic takes about a quarter less time in the browser, so game days and clicks pause for less on phones. Traffic goes exactly where it went before.","Your own subsea cable can no longer be longer than any optic can light (#88). New York to Sydney now says so before you pay, instead of after the ship comes home. Calling off a cable while it is still being laid returns most of the price of the part not laid yet, and an unusable cable from an older save goes back for a full refund.","Your own IX can now live in either building of a two-site metro, or in both with a second switch, so a dark building no longer takes your exchange down (#36). The LAG buttons that did nothing on your own IX are gone.","Upgrading the only router in a POP that has nothing plugged in yet no longer opens a maintenance window or a NOC warning (#105).","Declining a loan offer clears the bank badge right away, even while the game is paused (#104).","The 3.2T transponder now falls back to 1.2T between 4,000 and 5,500 km (6,000 to 8,250 km subsea), like the 1.6T one, instead of dropping to 800G (#107). A bigger optic now carries at least as much as a smaller one at every distance.","Parallel waves of different sizes now show each size on the map, like 800G + 400G, instead of a misleading 2 × 1.2T (#56).","Picking a subsea route from a city without a cable landing, like Oslo, now names the nearest landing station instead of saying its cables reach \"nowhere\" (#50)."];
 const IS_DEV=APP_VERSION.startsWith('__');
 // Only report from the real site; previews, localhost and the Claude viewer stay silent.
 const ANALYTICS={host:/(^|\.)seriesoftub\.es$/.test(location.hostname)?'https://stats.seriesoftub.es':'',site:'seriesoftub.es'};
@@ -2006,9 +2006,12 @@ function compute(){
   let f=null,Dv=null,Pv=null,PP=null,vis=0;const walked=[],G=[],NEG=[];
   // An exit the flow can still try: not visited yet, not full when the flow started, and reachable from the POP.
   const usable=e=>e.vis!==vis&&e.used<e.cap&&Dv[e.ci]<Infinity,byDist=(a,b)=>a.hp-b.hp||Dv[a.ci]-Dv[b.ci];
-  // Push up to `want` along one path to exit e; returns what fitted.
-  const push=(e,P,want,keep=0)=>{const path=P.path,ni=P.ni;let amt=want;
-    for(const l of path)amt=Math.min(amt,l.res-l.cap*keep);for(const i of ni)if(HAS[i])amt=Math.min(amt,NRES[i]);
+  // Push up to `want` along one path to exit e; returns what fitted. Capacity only shrinks while routing, so a
+  // path with one full link or node fits nothing for the rest of this pass: mark it, and later tries cost nothing
+  // (most tries are into paths that filled up earlier).
+  const push=(e,P,want,keep=0)=>{if(P.dead)return 0;const path=P.path,ni=P.ni;let amt=want;
+    for(const l of path){const r=l.res;if(r<=1e-6){P.dead=1;return 0;}amt=Math.min(amt,r-l.cap*keep);}
+    for(const i of ni)if(HAS[i]){const r=NRES[i];if(r<=1e-6){P.dead=1;return 0;}amt=Math.min(amt,r);}
     if(amt<=1e-6)return 0;
     for(const i of ni)if(HAS[i])nodeTake(i,amt);
     const ek=e.ek,nr=f.nr,ci=f.ci;if(!e.told||e.dup){R2.egDesc[ek]=e.desc;e.told=true;}
@@ -2045,9 +2048,15 @@ function compute(){
       G.length=0;
       if(!lst.hi&&ALONE[f.ci]){const here=lst.at.get(f.ci);if(here)for(const e of here)if(e.used<e.cap)G.push(e);}
       if(!G.length){
-        let bh=2,bd=Infinity;for(const e of lst)if(e.used<e.cap){const d=Dv[e.ci];if(d<Infinity&&(e.hp<bh||(e.hp===bh&&d<bd))){bh=e.hp;bd=d;}}
+        // One scan: the best (preference, distance) so far and, in list order, the exits within 1e-6 of it. The best
+        // distance only goes down, so dropping the ones it leaves behind gives exactly the exits a second scan would.
+        // Exits that are full stay full for this pass: when a quarter of a list is, it is rewritten without them.
+        let bh=2,bd=Infinity,full=0;
+        for(const e of lst){if(e.used>=e.cap){full++;continue;}const d=Dv[e.ci];if(d===Infinity)continue;const h=e.hp;
+          if(h<bh){bh=h;bd=d;G.length=0;G.push(e);}
+          else if(h===bh){if(d<bd){bd=d;let k=0;for(const x of G)if(Dv[x.ci]-d<1e-6)G[k++]=x;G.length=k;G.push(e);}else if(d-bd<1e-6)G.push(e);}}
+        if(full*4>=lst.length&&full){let k=0;for(const e of lst)if(e.used<e.cap)lst[k++]=e;lst.length=k;}
         if(bh>1)continue;
-        for(const e of lst)if(e.hp===bh&&e.used<e.cap){const d=Dv[e.ci];if(d<Infinity&&d-bd<1e-6)G.push(e);}
         if(G.length>1)G.sort(byDist);}
       sendGroup(G);
       if(f.rem<=1e-6)continue;
@@ -2812,9 +2821,9 @@ const ACT={
  leaseSwap:({a,b,src})=>{if(!S.pops[a]||!S.pops[b]||a===b)return;$('dash').hidden=true;UI.lmode='df';UI.dfSrc=['lease','build','cable'].includes(src)?src:isSub(a,b)?'cable':'build';UI.dfSys=lvl()>=3?'roadm':'lite';openLinkModal(a,b);},
  dashLink:({id})=>{$('dash').hidden=true;selectLink(id);},
  animSet:({v})=>{if(!['auto','on','off'].includes(v))return;UI.anim=v;try{localStorage.setItem('sot-anim',v);}catch(e){}applyAnim();refreshSettings();},
- soundSet:({v})=>{UI.muted=v==='off';try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();refreshSettings();},
+ soundSet:({v})=>{UI.muted=v==='off';if(!UI.muted){audioInit();sfx('click');}try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();refreshSettings();},
  langSet:({v})=>{if(!Object.hasOwn(LANGS,v)||v===LANG)return;try{localStorage.setItem('sot-lang',v);}catch(e){}save();location.reload();},
- mute:()=>{UI.muted=!UI.muted;try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();},
+ mute:()=>{UI.muted=!UI.muted;if(!UI.muted){audioInit();sfx('click');}try{localStorage.setItem('sot-mute',UI.muted?'1':'0');}catch(e){}renderHUD();},
  closePanel:()=>{UI.sel=null;UI.confirm=null;renderPanel();renderLeft();},
  closeModal:()=>closeModal(),
  tab:({t})=>{UI.tab=t;UI.confirm=null;renderPanel();},
@@ -3095,7 +3104,10 @@ function loadSave(){try{const t=localStorage.getItem('sot-save-v1');if(t){const 
 
 /* ================= AUDIO ================= */
 let AC=null;
-function audioInit(){if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+function audioInit(){try{if(!AC||AC.state==='closed')AC=new (window.AudioContext||window.webkitAudioContext)();
+  // Browsers may suspend audio after a tab/app switch; retry on the next user gesture.
+  if(AC.state==='suspended'||AC.state==='interrupted'){const r=AC.resume();if(r&&r.catch)r.catch(()=>{});}
+}catch(e){}}
 function tone(f,t0,dur,type='square',vol=.05){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,AC.currentTime+t0);g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+t0+dur);o.connect(g).connect(AC.destination);o.start(AC.currentTime+t0);o.stop(AC.currentTime+t0+dur+.02);}
 function sfx(k){if(UI.muted||!AC)return;try{
   if(k==='coin'){tone(988,0,.08);tone(1319,.08,.18);}
