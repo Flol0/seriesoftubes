@@ -25,7 +25,7 @@ test('perf bench: runs end to end on a small save and compares a version with it
   const save = path.join(dir, 'save.json'), js = path.join(dir, 'out.json');
   fs.writeFileSync(save, JSON.stringify({ app: 'series-of-tubes', version: 'test', S: JSON.parse(ev('JSON.stringify(S)')) }));
   const md = execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'perf-bench.js'), '--save', save,
-    '--base', path.join(__dirname, '..', 'site', 'index.html'), '--runs', '3', '--json', js], { encoding: 'utf8' });
+    '--base', require('../scripts/lib/page').pageFile(path.join(dir, 'base.html')), '--runs', '3', '--json', js], { encoding: 'utf8' });
   assert.match(md, /2 POPs/, 'reads an exported save');
   assert.match(md, /Routing results are identical to the base/);
   assert.match(md, /\| Routing: compute\(\) \|/);

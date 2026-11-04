@@ -1,43 +1,66 @@
 ---
 name: add-strings
-description: Add or change player-facing text in Series of Tubes and keep every translation (site/i18n/*.js) complete.
+description: Add or change player-facing text in Series of Tubes: labels in the code, English in src/i18n/en.js, and every translation (site/i18n/*.js) kept complete.
 ---
 
 # Adding or changing player-facing text
 
-The English text is the translation key. Every string a player can see must go
-through the translation helpers and have an entry in every dictionary in `site/i18n/`
-(currently `it.js`, Italian).
+Text is keyed by **label** ([docs/adr/0003-translations-by-label.md](../../../docs/adr/0003-translations-by-label.md)).
+The code says `tr('pnis.delivery_2_to_6_weeks')`; the English is in `src/i18n/en.js`; Italian, Portuguese
+and French are `site/i18n/it.js`, `pt.js`, `fr.js`. Every label the code uses needs English, and every
+language needs every label.
 
 ## In the code
 
-- `tr('Text with {name}', {name})`: translate now and fill placeholders.
-- `trn('{n} router', '{n} routers', n, vars)`: plurals; both forms are keys.
-- `N_('Text')`: marks a literal kept in a table for later `tr()` (e.g. labels stored in
-  constants). Call `tr(x)` where it's shown.
-- Static HTML: add `data-i18n` to the element; `aria-label` and `title` attributes are
-  collected automatically.
-- Text must be a string literal inside the call, or the checker can't see it.
-- Keep HTML (`<b>`, `<br>`, `<small>`) and `{placeholders}` identical in translations.
-- Don't build sentences by concatenating translated fragments; translate whole sentences.
+- `tr('area.label', {name})`: translate now and fill `{placeholders}`.
+- `trn('area.label', n, vars)`: plurals. One label, whose entries are `{"one": "…", "other": "…"}`;
+  `{n}` is filled in for you.
+- `N_('area.label')`: a label kept in a table or a save and translated where it is shown with
+  `tr(x)`. Anything stored in `S` must be an `N_()` label (or an index), never translated text and never
+  a label written any other way: the build shortens every label it sees in `tr()`/`trn()` to an id that
+  changes between releases, and keeps the `N_()` ones whole.
+- The label is always a string literal, the first argument of `tr`/`trn`/`N_`. A label anywhere else
+  (`const x='pnis.ready'`) is an error in `npm run i18n:check`.
+- Static HTML in `src/index.html`: `data-i18n="area.label"` on the element, with its English inside it;
+  `data-i18n-aria-label="…"` and `data-i18n-title="…"` next to those attributes.
+- Keep HTML (`<b>`, `<br>`, `<small>`) and `{placeholders}` identical in every language.
+- Don't build sentences from translated fragments; translate whole sentences.
 
-## In the dictionary
+## Naming a label
 
-`site/i18n/it.js` is one object, `"English": "Italiano",` per line, ending with `};`.
-Append new entries before the closing `};`. A small script avoids quoting mistakes:
+`area.some_words`: the area is the file or topic it is shown in (`pnis`, `own_cable`, `dashboard`,
+`page` for the static markup), or `common` for text used all over and short everyday words
+(`common.close`, `common.customers`). The words are the first few words of the English, lower case,
+`_` between them: `pnis.ready_in_about_n_days`. Labels are only for finding things; players never see
+them. Reuse an existing label when the text and the meaning are the same (`grep -n '"Close"' src/i18n/en.js`).
 
-```python
-import json
-it = {"New English text": "Nuovo testo italiano"}
-q = 'site/i18n/it.js'; t = open(q).read().rstrip()
-assert t.endswith('};')
-t = t[:-2] + ''.join(json.dumps(k, ensure_ascii=False) + ':' + json.dumps(v, ensure_ascii=False) + ',\n'
-                     for k, v in it.items() if json.dumps(k, ensure_ascii=False) + ':' not in t) + '};\n'
-open(q, 'w').write(t)
+## In the dictionaries
+
+Every dictionary is one entry per line, **sorted by label**, so new text from different pull requests
+lands on different lines. Don't edit them by hand; the script writes English and translations together:
+
+```bash
+cat > /tmp/strings.json <<'JSON'
+{
+  "en": { "pnis.ready_in_about_n_days": "Ready in about {n} days",
+          "save.n_pop": { "one": "{n} POP", "other": "{n} POPs" } },
+  "it": { "pnis.ready_in_about_n_days": "Pronto tra circa {n} giorni",
+          "save.n_pop": { "one": "{n} POP", "other": "{n} POP" } },
+  "pt": { "pnis.ready_in_about_n_days": "Pronto em cerca de {n} dias" },
+  "fr": { "pnis.ready_in_about_n_days": "Prêt dans environ {n} jours" }
+}
+JSON
+node scripts/i18n-add.js /tmp/strings.json          # a string or {one, other} sets an entry, null removes it
+node scripts/i18n-add.js --rename old.label new.label   # in every dictionary and everywhere in src/
 ```
 
-When you **change** English text, rename the key in every dictionary too; when you
-remove text, delete its entry.
+- **Changing English wording** (a typo, a clearer phrase, same meaning): change only the English. The
+  translations stay right.
+- **Changing the meaning**: give the text a new label (`--rename`, then update the English and every
+  translation), so no language keeps a translation that now says something else.
+- **Removing text**: `null` under `"en"` removes the label from every dictionary.
+
+`npm run i18n:fix` re-sorts a dictionary that got out of order (a hand edit, a merge).
 
 ## Italian style
 
@@ -45,9 +68,18 @@ Natural, friendly Italian, informal "tu". Keep networking terms that Italian eng
 use in English (peering, transit, router, POP, PNI, LAG, dark fiber). Translate puns
 into an Italian joke when one fits; otherwise keep the pun name and translate the rest.
 
+## German style
+
+Natural, friendly German, informal "du". Networking terms that German engineers say in English stay
+English (Peering, Transit, Dark Fiber, Wave, Port, Router, POP, IX, Exchange, Backbone, Link, Traffic,
+Route Server, Line System, LAG, PNI, Fabric, Scrubbing), but plain "fiber" is "Glasfaser",
+"fiber pair" is "Faserpaar" and "eyeballs" are always "Privatkunden". "/mo" is "/Monat", "{n}d" is
+"{n} T.", money keeps the game's `$100k` style, quotes are „…“. Translate puns into a German joke
+when one fits; otherwise keep the pun name.
+
 ## Check
 
 ```bash
-node scripts/i18n-check.js   # must say: 0 missing, 0 unused, 0 broken
-npm test                     # includes tests/i18n.test.js
+node scripts/i18n-check.js   # en.js: 0 problems; each language: 0 missing, 0 unused, 0 broken
+npm test                     # includes tests/i18n.test.js (every screen in every language) and the shipped page
 ```

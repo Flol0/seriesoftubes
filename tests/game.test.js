@@ -171,48 +171,6 @@ test('bank: the venture vultures take a share of revenue instead of payments', (
   assert.ok(Math.abs(ev('R.cost.revshare') - ev('R.revMo') * 0.1) < 1);
 });
 
-test('Flowspec is a router-model capability, and each tool answers a flood', () => {
-  const { ev, errors } = load();
-  // The capability table: full TCAM leaves least junk, basic more, none lets it all through.
-  assert.ok(ev("FS_RES[2] < FS_RES[1] && FS_RES[1] < FS_RES[0] && FS_RES[0] === 1"), 'full trims more than basic, basic more than none');
-  assert.ok(ev("RG.some(r=>r.fs===0) && RG.some(r=>r.fs===1) && RG.some(r=>r.fs===2)"), 'models span none/basic/full TCAM');
-  // Start on the used Rusty Router (rgen 0), which has no Flowspec TCAM.
-  ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1});compute()");
-  assert.equal(ev("fsAt('fra')"), 0, 'the Rusty POP cannot do Flowspec');
-  const clean = ev('R.served');
-  assert.ok(clean > 20, 'traffic flows before the attack');
-  // A 300 Gbps DNS flood on fra: with no TCAM here the junk starves the exit and node.
-  ev("S.ev.ddos={city:'fra',vec:'dns',gbps:300,until:S.day+3,entry:{k:'t',lab:'x'},bh:false,start:S.day};compute()");
-  const none = ev('R.served');
-  assert.ok(none < clean, 'an unfiltered flood displaces real traffic');
-  // Give this same router Flowspec TCAM (holding its forwarding capacity fixed): the DNS flood is filtered.
-  const full = ev("RG[0].fs=2;compute();R.served"); ev("RG[0].fs=0");
-  assert.ok(full > none, 'a Flowspec-capable router recovers a known flood');
-  // It cannot touch an application-layer HTTP flood, however big the TCAM.
-  const http = ev("RG[0].fs=2;S.ev.ddos.vec='http';compute();const s=R.served;RG[0].fs=0;s");
-  assert.ok(Math.abs(http - none) < 1, 'Flowspec is useless against HTTP');
-  // Scrubbing cleans any vector, regardless of router. A 1T center swallows this 300 Gbps flood whole.
-  ev("S.ev.ddos.vec='dns';S.scrubs=[{city:'fra',tier:1}];S.scrubMode='always';compute()");
-  assert.ok(ev('R.served') > none, 'scrubbing recovers real traffic');
-  assert.deepEqual(errors, []);
-});
-
-test('RTBH blackholes the victim, and HackBack 3000 is a gamble', () => {
-  const { ev } = load();
-  ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=120;ACT.buyTransit({city:'fra',net:'cog',tier:1});compute()");
-  ev("S.ev.ddos={city:'fra',vec:'syn',gbps:200,until:S.day+3,entry:{k:'edge',lab:''},bh:false,start:S.day};ACT.rtbh();compute()");
-  assert.equal(ev('S.ev.ddos.bh'), true);
-  assert.equal(ev('S.stats.rtbh'), 1);
-  assert.ok(ev("R.citySrv.fra") < 1, 'the blackholed city serves nothing');
-  // HackBack: a forced win ends the attack early.
-  ev("S.ev.ddos.bh=false;S.ev.ddos.until=S.day+3;const _r=Math.random;Math.random=()=>0.1;ACT.hackback();Math.random=_r");
-  assert.ok(ev('S.ev.ddos.until') <= ev('S.day'), 'a lucky hack-back ends it');
-  // A forced miss fines you and marks you a vigilante.
-  ev("S.ev.ddos={city:'fra',vec:'dns',gbps:50,until:S.day+3,entry:{k:'edge',lab:''},bh:false,start:S.day};const c=S.cash;const _r=Math.random;Math.random=()=>0.9;ACT.hackback();Math.random=_r;window.__fined=c-S.cash");
-  assert.ok(ev('window.__fined') > 20000, 'a bad hack-back costs the fee plus a fine');
-  assert.equal(ev('S.stats.vigilante'), 1);
-});
-
 test('old saves load, and a stale flat DDoS object is repaired away', () => {
   const { ev } = load();
   ev("ACT.start({})");
@@ -222,57 +180,6 @@ test('old saves load, and a stale flat DDoS object is repaired away', () => {
   // A well-formed attack survives sanitize with its fields coerced.
   const kept = ev("const s=JSON.parse(JSON.stringify(S));s.ev={ddos:{city:'fra',vec:'dns',gbps:'80',until:9}};sanitize(s);JSON.stringify([s.ev.ddos&&s.ev.ddos.vec, s.ev.ddos&&s.ev.ddos.gbps])");
   assert.deepEqual(JSON.parse(kept), ['dns', 80], 'a shaped attack is kept, numbers coerced');
-});
-
-test('scrubbing tiers: capacity caps what a center can clean, and on-demand lags', () => {
-  const { ev } = load();
-  ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1});S.ev.ddos={city:'fra',vec:'dns',gbps:300,until:S.day+3,entry:{k:'t',lab:'x'},bh:false,start:S.day};compute()");
-  const none = ev('R.served');
-  // A 100G center cannot swallow a 300 Gbps flood; a 10T center can.
-  const small = ev("S.scrubs=[{city:'fra',tier:0}];S.scrubMode='always';compute();R.served");
-  const big = ev("S.scrubs[0].tier=2;compute();R.served");
-  assert.ok(big > small, 'a bigger scrubbing tier cleans more');
-  assert.ok(big > none, 'the 10T center recovers the flood');
-  // On-demand does nothing until it engages (SCRUB_DELAY days in).
-  const notYet = ev("S.scrubMode='ondemand';S.ev.ddos.start=S.day;compute();R.served");
-  const engaged = ev("S.ev.ddos.start=S.day-SCRUB_DELAY;compute();R.served");
-  assert.ok(engaged > notYet, 'on-demand scrubbing kicks in only after the delay');
-});
-
-test('clean-pipe on the entry transit, a sacrificial PNI, and an IX blackhole each blunt a flood', () => {
-  const { ev } = load();
-  ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1})");
-  const tid = ev("S.transit[0].id");
-  ev(`S.ev.ddos={city:'fra',vec:'dns',gbps:400,until:S.day+3,entry:{k:'t',id:'${tid}'},bh:false,start:S.day};compute()`);
-  const raw = ev('R.served');
-  // Clean-pipe on the transit the attack enters: the provider scrubs it upstream.
-  const clean = ev(`S.transit[0].clean=true;compute();const s=R.served;S.transit[0].clean=false;s`);
-  assert.ok(clean > raw, 'clean-pipe on the entry transit recovers traffic');
-  // A sacrificial CN PNI contains a flood entering over it (capped at the small port).
-  ev("S.pni.push({id:'pn1',city:'fra',net:'ctc',tier:1,n:1,site:'a',sacrif:true});S.ev.ddos.entry={k:'p',id:'pn1'}");
-  const contained = ev("compute();R.served");
-  const uncontained = ev("S.pni[0].sacrif=false;compute();const s=R.served;S.pni[0].sacrif=true;s");
-  assert.ok(contained > uncontained, 'a sacrificial PNI contains the flood');
-  // IX blackhole: ~half the junk gone, victim stays up. Shrink the flood so the drop shows in served.
-  ev("ACT.buyIx({city:'fra',tier:1,signed:true});S.ev.ddos.entry={k:'t',id:S.transit[0].id};S.ev.ddos.gbps=180");
-  const before = ev("compute();R.served");
-  ev("ACT.ixbh()");
-  assert.equal(ev('S.ev.ddos.ixbh'), true, 'blackhole announced');
-  assert.equal(ev('S.ev.ddos.bh'), false, 'the customer is not taken dark');
-  assert.ok(ev("compute();R.served") > before, 'the IX blackhole drops some junk');
-});
-
-test('SLA: a protected customer that still goes down costs an SLA credit, once', () => {
-  const { ev } = load();
-  ev("ACT.start({});S.cash=1e8;ACT.launchBB({city:'fra'});S.pops.fra.bb.d=200;ACT.buyTransit({city:'fra',net:'cog',tier:1});S.nextFail=1e9;S.nextEvent=1e9");
-  // A DDoS protection customer, an overwhelming flood, a 100G center that can't cope.
-  ev("S.scrubs=[{city:'fra',tier:0}];S.biz.push({id:'b1',city:'fra',type:'scrub',bw:5,rate:900,mood:80,since:0,reqs:[]});S.ev.ddos={city:'fra',vec:'dns',gbps:6000,until:S.day+5,entry:{k:'t',lab:'x'},bh:false,start:S.day}");
-  ev("dayTick()");
-  assert.equal(ev('S.stats.sla'), 1, 'one SLA breach recorded');
-  assert.ok(ev('S.biz[0].mood') < 70, 'the SLA breach dented their mood');
-  // The same attack does not bill twice.
-  ev("dayTick()");
-  assert.equal(ev('S.stats.sla'), 1, 'the same attack is only billed once');
 });
 
 test('DDoS goal and badges unlock from the right state', () => {
@@ -355,53 +262,207 @@ test('loans: good terms need good credit, big loans want revenue, and the weird 
   assert.deepEqual(errors, []);
 });
 
-test('#117 several scrubbing centers: nearest first, spill to the next, and far ones haul the flood over the backbone', () => {
+test('notifications: the NOC keeps the last ten minutes, folds repeats and opens what each is about', () => {
   const { ev, errors, dom } = load();
-  // an old save with one center carries it over
-  ev("ACT.start({});S.cash=1e9;S.lvl=6;S.nextFail=1e9;S.nextEvent=1e9");
-  ev("const o=JSON.parse(JSON.stringify(S));o.scrubAt='fra';o.scrubTier=1;delete o.scrubs;migrate(o);window.__o=o");
-  assert.deepEqual(JSON.parse(ev("JSON.stringify(window.__o.scrubs)")), [{ city: 'fra', tier: 1 }]);
-  assert.equal(ev("'scrubAt' in window.__o||'scrubTier' in window.__o"), false);
-  // New York and London over one transatlantic wave
-  ev("for(const c of ['nyc','lon']){ACT.buildPop({city:c});}for(const c of ['fra','nyc','lon'])S.pops[c].rgen=3;ACT.launchBB({city:'nyc'});S.pops.nyc.bb.d=150");
-  ev("ACT.buyTransit({city:'nyc',net:'cog',tier:2});ACT.buyTransit({city:'lon',net:'cog',tier:3});UI.via='grace';UI.route='same';openLinkModal('nyc','lon');ACT.buildLink({tier:3});closeModal()");
-  const tl = "S.links.find(l=>[l.a,l.b].includes('nyc')).id";
-  const atk = g => ev(`S.ev.ddos={city:'nyc',vec:'http',gbps:${g},until:S.day+3,entry:{k:'t',lab:'x'},bh:false,start:S.day-5};compute()`);
-  // build in two cities, one each; the bill adds up
-  ev("ACT.buildScrub({city:'fra',tier:1});ACT.buildScrub({city:'lon',tier:1});ACT.buildScrub({city:'lon',tier:2})");
-  assert.deepEqual(JSON.parse(ev("JSON.stringify(S.scrubs.map(x=>x.city+':'+x.tier))")), ['fra:1', 'lon:1'], 'one center per city');
-  assert.equal(ev('scrubMo()'), 2 * ev('SCRUB_TIERS[1].mo'));
-  // Frankfurt has no backbone path from New York, so the flood goes to London, across the Atlantic
-  atk(0); const quiet = ev(`R.load[${tl}]||0`);
-  atk(600);
-  assert.deepEqual(JSON.parse(ev("JSON.stringify(R.haul.map(q=>q.to))")), ['lon']);
-  assert.ok(ev('R.haul[0].h') > 590, 'all of it fits on the 800G wave');
-  assert.ok(ev('R.haul[0].ms') > 30 && ev('R.haul[0].ms') < 120, `a transatlantic detour (${ev('R.haul[0].ms').toFixed(0)} ms)`);
-  assert.ok(ev(`R.load[${tl}]`) > quiet + 500, 'the flood fills the transatlantic link');
-  assert.match(ev('ddosPanel()'), /hauled over your backbone/);
-  // a protected customer in New York minds the detour
-  ev("S.biz.push({id:'bs',city:'nyc',type:'scrub',bw:5,rate:900,mood:80,since:0,reqs:['scrubnear']})");
-  assert.match(ev("bizWhy(S.biz.find(b=>b.id==='bs')).join(' ')"), /hauled to London/);
-  assert.equal(ev("REQS.scrubnear.ok(S.biz.find(b=>b.id==='bs'))"), false, 'no center in the Americas yet');
-  // a center in New York cleans it on the spot: nothing crosses the ocean
-  ev("ACT.buildScrub({city:'nyc',tier:0})");atk(600);
-  assert.equal(ev("R.haul.filter(q=>q.to==='lon').length"), 1, '100G local, the rest spills to London');
-  assert.equal(ev("R.haul.some(q=>q.to==='nyc')"), false);
-  assert.ok(ev("REQS.scrubnear.ok(S.biz.find(b=>b.id==='bs'))"));
-  ev("S.scrubs.find(x=>x.city==='nyc').tier=1");atk(600);
-  assert.equal(ev('R.haul.length'), 0, 'a 1T center at home takes it all');
-  assert.ok(ev(`R.load[${tl}]||0`) < quiet + 50);
-  // over a thin link only part of it can be hauled; the rest is not scrubbed
-  ev("ACT.rmScrub({city:'nyc'});ACT.rmScrub({city:'nyc'})");
-  assert.equal(ev("S.scrubs.some(x=>x.city==='nyc')"), false, 'shut down after confirming');
-  ev(`S.links.find(l=>l.id===${tl}).tier=1`);atk(600);
-  assert.ok(ev('R.haul[0].h') < 120 && ev('R.haul[0].h') > 0, `the 100G wave caps the haul (${ev('R.haul[0].h').toFixed(0)})`);
-  assert.match(ev('ddosPanel()'), /can only haul/);
-  // the Infra tab says where attacks go from here
-  ev("ACT.selCity&&ACT.selCity({id:'nyc'});UI.sel={type:'city',id:'nyc'};UI.tab='infra';renderPanel()");
-  assert.match(dom.window.document.getElementById('panelBody').textContent, /nearest scrubbing center\. From here that is London/);
-  // closing a POP closes its center
-  ev("ACT.decomOpen({});ACT.decomToggle({city:'lon'});ACT.decomGo()");
-  assert.equal(ev("S.scrubs.some(x=>x.city==='lon')"), false);
+  const doc = dom.window.document;
+  ev("let __t=1e12;Date.now=()=>__t;window.__tick=ms=>{__t+=ms};");
+  ev("ACT.start({});S.cash=1e9;S.nextFail=1e9;S.nextEvent=1e9;for(const c of ['ams','lon'])ACT.buildPop({city:c});UI.via=null;openLinkModal('ams','lon');ACT.buildLink({tier:1});closeModal();S.log=[];UI.logSeen=0");
+  const linkId = ev("S.links.find(l=>[l.a,l.b].includes('ams')&&[l.a,l.b].includes('lon')).id");
+  // what each notice is about: its own button, a link between two of your cities, one of your cities, or nothing
+  ev("toast('<b>Customer upset</b><br>Fix it.','bad',[{l:'Show me',act:'focusCity',args:{city:'fra'}}])");
+  ev("toast('<b>Fiber cut</b><br>Your Amsterdam–London link is down.','bad')");
+  ev("toast('<b>Router crashed</b><br>Your router in London is rebooting.','bad')");
+  ev("toast('<b>Raffle</b><br>You won a T-shirt.','good')");
+  const os = JSON.parse(ev("JSON.stringify(S.log.map(e=>e.o))"));
+  assert.deepEqual(os, [null, { a: 'city', v: 'lon' }, { a: 'link', v: linkId }, { a: 'city', v: 'fra' }]);
+  assert.equal(ev("S.log[0].h"), 'Raffle'); assert.equal(ev("S.log[0].t"), 'Raffle You won a T-shirt.');
+  // an incident points at what broke
+  assert.deepEqual(JSON.parse(ev(`JSON.stringify(incOpen({ref:'${linkId}'}))`)), { a: 'link', v: linkId });
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(incOpen({ref:S.links[0].trench||S.links[0].id}))")), { a: 'link', v: ev('S.links[0].id') });
+  // repeats within a minute fold into one line with a count; numbers in the title do not split them
+  ev("for(let i=1;i<=5;i++)toast('<b>'+i+' new sessions at HAMS-IX.</b><br>Small networks.','')");
+  assert.equal(ev("S.log.length"), 5); assert.equal(ev("S.log[0].n"), 5); assert.equal(ev("S.log[0].h"), '5 new sessions at HAMS-IX.');
+  ev("__tick(61000);toast('<b>1 new session at HAMS-IX.</b><br>Small networks.','')");
+  assert.equal(ev("S.log.length"), 6, 'a minute later it starts a new line');
+  // the NOC shows them right after the incidents, with Open where there is something to open
+  assert.equal(ev("logUnread()"), 6);
+  ev("renderHUD()"); assert.equal(doc.getElementById('hNocNew').hidden, true, 'no unread count on the NOC button (2.0)');
+  ev("UI.left='noc';UI.leftOpen=true;UI.sel=null;renderLeft();renderHUD()");
+  const body = doc.getElementById('leftBody').textContent;
+  assert.match(body, /Notifications\s*last 10 minutes/);
+  assert.ok(body.indexOf('Notifications') < body.indexOf('Incidents so far'), 'near the top, not at the bottom');
+  assert.doesNotMatch(body, /DDoS scrubbing/, 'the settings moved to Routing & DDoS');
+  assert.match(body, /×5/); assert.match(body, /just now/);
+  assert.equal(doc.querySelectorAll('#leftBody [data-act=logOpen]').length, 2, 'Open only where it leads somewhere (2 of the 5 shown)');
+  assert.equal(ev("logUnread()"), 0);
+  ev("ACT.logAll()"); assert.equal(doc.querySelectorAll('#leftBody .note').length, 6); assert.equal(doc.querySelectorAll('#leftBody [data-act=logOpen]').length, 3);
+  // Open goes there
+  ev("ACT.logOpen({id:S.log.find(e=>e.o&&e.o.a==='link').id})"); assert.equal(ev("UI.sel.type+':'+UI.sel.id"), 'link:' + linkId);
+  ev("ACT.logOpen({id:S.log.find(e=>e.o&&e.o.a==='city'&&e.o.v==='lon').id})"); assert.equal(ev("UI.sel.type+':'+UI.sel.id"), 'city:lon');
+  ev(`S.links=S.links.filter(l=>l.id!=='${linkId}');ACT.logOpen({id:S.log.find(e=>e.o&&e.o.a==='link').id})`);
+  assert.equal(ev("S.log[0].h"), 'That link is gone.', 'a removed link says so instead of failing silently');
+  // ten minutes later it is gone from the list, but stays in the save's log
+  ev("__tick(10*60*1000+1000);UI.left='noc';renderLeft()");
+  assert.match(doc.getElementById('leftBody').textContent, /Nothing in the last 10 minutes/);
+  assert.ok(ev("S.log.length") > 0);
+  // saves: junk is dropped, old entries without a time stay but are not shown
+  ev("S.log.push({t:'old',k:'weird',o:{a:'city',v:'atlantis'},n:'many'},{t:5},{t:'x',o:{a:'tab',v:'evil'}},{t:'y',o:{a:'link',v:'l1'},at:'soon'});S=sanitize(S)");
+  const tail = JSON.parse(ev("JSON.stringify(S.log.slice(-3))"));
+  assert.deepEqual(tail.map(e => [e.t, e.k, e.o, e.n, e.at]), [['old', '', null, 1, 0], ['x', '', null, 1, 0], ['y', '', { a: 'link', v: 'l1' }, 1, 0]]);
+  // phones: the NOC tab shows no numbers, only a red dot while something is broken
+  ev("__tick(1000);toast('<b>Router crashed</b><br>Your router in London is rebooting.','bad');UI.left='goals';UI.leftOpen=false");
+  dom.window.innerWidth = 360; ev("renderAll&&renderAll()");
+  const nocTab = [...doc.querySelectorAll('#tabbar [data-act=phoneTab]')].find(b => JSON.parse(b.dataset.args).t === 'noc');
+  assert.equal(nocTab.querySelector('.cnt'), null, 'no number for unread notifications on the NOC tab');
+  ev("S.inc.push({id:'x1',type:'crash',city:'lon',msg:'',until:S.day+3});renderAll()");
+  const nocTab2 = [...doc.querySelectorAll('#tabbar [data-act=phoneTab]')].find(b => JSON.parse(b.dataset.args).t === 'noc');
+  assert.ok(nocTab2.querySelector('.cnt.dot.red'), 'a live incident shows a red dot');
+  assert.equal(nocTab2.querySelector('.cnt').textContent, '', 'and no number');
   assert.deepEqual(errors, []);
 });
+
+test('the broadband panel shows what homes in that city really pay, not the base rate', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.buildPop({city:'del'})");
+  assert.equal(ev('CITY.del.arpu'), 0.4);
+  assert.match(ev("cityPanel('del')"), new RegExp('Pays \\' + ev('fmt$(EYE_RATE*CITY.del.arpu)') + ' per Gbps'), 'Delhi homes pay 40% of the base rate');
+  assert.match(ev("cityPanel('fra')"), new RegExp('Pays \\' + ev('fmt$(EYE_RATE)') + ' per Gbps'), 'a city without its own rate pays the base rate');
+  ev("const t=NETS.find(n=>n.price&&n.pops.includes('del'));ACT.buyTransit({city:'del',net:t.id,tier:1});ACT.launchBB({city:'del'});compute()");
+  const rev = ev("fmt$(R.cityEye.del*sfOf(R,'del')*EYE_RATE*CITY.del.arpu)");
+  assert.ok(ev("R.cityEye.del*sfOf(R,'del')") > 0);
+  assert.ok(ev("cityPanel('del')").includes(rev + '/mo'), `revenue line matches what the month pays (${rev})`);
+  assert.deepEqual(errors, []);
+});
+
+// Custom routing metrics: a fra–ams–par triangle where the direct fra–par link is normally shortest.
+const triangle = (ev) => {
+  ev("ACT.start({});S.cash=1e9;S.lvl=4;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'})");
+  ev("for(const c of ['ams','par'])ACT.buildPop({city:c});const L=(a,b)=>{UI.via=null;openLinkModal(a,b);ACT.buildLink({tier:1});closeModal();};L('fra','ams');L('ams','par');L('fra','par');compute()");
+  ev("window.FP=S.links.find(l=>(l.a==='fra'&&l.b==='par')||(l.a==='par'&&l.b==='fra')).id;window.FK=edgeKey(S.links.find(l=>l.id===FP));window.pmOf=()=>S.pairMet[FK];window.hops=()=>JSON.stringify(trPaths('fra').path('par').map(h=>h.l.id))");
+};
+
+test('a custom multiplier routes exactly like the matching preset', () => {
+  const { ev, errors } = load();
+  triangle(ev);
+  assert.equal(ev("hops()"), JSON.stringify([ev("FP")]), 'direct link wins by default');
+  ev("ACT.setMetric({id:FP,v:'avoid'})");
+  const avoid = ev("JSON.stringify({h:hops(),load:R.load,served:R.served})");
+  ev("ACT.setMetric({id:FP,v:'custom'})");
+  assert.equal(ev("pairMet(FK)"), 'custom');
+  const m = ev("pmOf()");
+  assert.equal(m.k, 'f');
+  assert.equal(m.v, 4, 'custom starts from the preset it replaces');
+  assert.equal(ev("JSON.stringify({h:hops(),load:R.load,served:R.served})"), avoid);
+  ev("ACT.setMetric({id:FP,v:'normal'})");
+  assert.equal(ev("FK in S.pairMet"), false, 'presets drop the custom metric');
+  assert.deepEqual(errors, []);
+});
+
+test('an absolute custom cost steers the path, and switching modes keeps the cost', () => {
+  const { ev, errors } = load();
+  triangle(ev);
+  ev("ACT.setMetric({id:FP,v:'custom'});ACT.metricMode({id:FP,k:'w'})");
+  const l = ev("S.links.find(l=>l.id===FP)");
+  assert.equal(ev("pmOf().k"), 'w');
+  assert.equal(ev("pmOf().v"), Math.round(l.km + 60), 'switching to cost keeps the effective metric');
+  ev("ACT.selLink({id:FP});renderAll();$('metIn').value='65535';ACT.metricSet({id:FP})");
+  assert.equal(ev("pmOf().v"), 65535);
+  assert.ok(!JSON.parse(ev("hops()")).includes(ev("FP")), 'a huge cost sends traffic round via Amsterdam');
+  ev("renderAll();$('metIn').value='1';ACT.metricSet({id:FP})");
+  assert.equal(ev("hops()"), JSON.stringify([ev("FP")]));
+  ev("ACT.metricMode({id:FP,k:'f'})");
+  assert.equal(ev("pmOf().v"), 0.1, 'converted back to a multiplier, clamped to the minimum');
+  assert.deepEqual(errors, []);
+});
+
+test('custom metric input is validated and clamped', () => {
+  const { ev, errors } = load();
+  triangle(ev);
+  ev("ACT.setMetric({id:FP,v:'custom'});ACT.selLink({id:FP});renderAll()");
+  ev("$('metIn').value='';ACT.metricSet({id:FP})");
+  assert.equal(ev("pmOf().v"), 1, 'empty input changes nothing');
+  ev("renderAll();$('metIn').value='9999';ACT.metricSet({id:FP})");
+  assert.equal(ev("pmOf().v"), 100);
+  ev("renderAll();$('metIn').value='0';ACT.metricSet({id:FP})");
+  assert.equal(ev("pmOf().v"), 0.1);
+  ev("ACT.metricMode({id:FP,k:'x'});ACT.setMetric({id:FP,v:'bogus'})");
+  assert.equal(ev("pairMet(FK)"), 'custom');
+  assert.deepEqual(errors, []);
+});
+
+test('custom metrics survive a save, and broken ones are repaired', () => {
+  const { ev, errors } = load();
+  triangle(ev);
+  ev("ACT.setMetric({id:FP,v:'custom'});ACT.metricMode({id:FP,k:'w'});pmOf().v=777;S=migrate(JSON.parse(JSON.stringify(S)));compute()");
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(pmOf())")), { k: 'w', v: 777 });
+  ev("S.pairMet[FK]={k:'zz',v:'lots'};S=migrate(JSON.parse(JSON.stringify(S)));compute()");
+  assert.deepEqual(JSON.parse(ev("JSON.stringify(pmOf())")), { k: 'f', v: 1 });
+  ev("S.pairMet[FK]={k:'w',v:1e9};S=migrate(JSON.parse(JSON.stringify(S)))");
+  assert.equal(ev("pmOf().v"), 65535);
+  // An old save: a preset metric on the link itself, from before metrics moved to the city pair.
+  ev("delete S.pairMet[FK];S.links.find(l=>l.id===FP).metric='avoid';S=migrate(JSON.parse(JSON.stringify(S)));compute()");
+  assert.equal(ev("pmOf()"), 'avoid');
+  assert.equal(ev("'metric' in S.links.find(l=>l.id===FP)"), false);
+  assert.equal(JSON.parse(ev("hops()")).length, 2, 'the old save still routes, avoiding the direct link');
+  assert.deepEqual(errors, []);
+});
+
+test('preset buttons stay plain, and Custom explains the numbers, also on phones', () => {
+  const { ev, dom, errors } = load();
+  triangle(ev);
+  for (const w of [1280, 390]) {
+    ev(`window.innerWidth=${w};ACT.setMetric({id:FP,v:'normal'});ACT.selLink({id:FP});renderAll()`);
+    const doc = dom.window.document;
+    const btns = [...doc.querySelectorAll('#panel [data-act="setMetric"]')];
+    assert.equal(btns.length, 5);
+    const km = ev("S.links.find(l=>l.id===FP).km");
+    assert.deepEqual(btns.map(b => b.textContent), ['Prefer', 'Normal', 'Avoid', 'Backup only', 'Custom']);
+    assert.equal(doc.getElementById('metIn'), null);
+    assert.doesNotMatch(doc.getElementById('panel').textContent, /times a multiplier/);
+    ev("ACT.setMetric({id:FP,v:'custom'})");
+    assert.ok(doc.getElementById('metIn'), `custom editor at ${w}px`);
+    assert.ok(doc.querySelector('#panel [data-act="metricMode"]'));
+    const txt = doc.getElementById('panel').textContent;
+    assert.match(txt, /times a multiplier/);
+    assert.match(txt, new RegExp(`Normal ×1 = ${Math.round(km + 60)}, Avoid ×4 = ${Math.round((km + 60) * 4)}`));
+    assert.match(txt, /Multiplier: scales the distance cost/);
+    assert.match(txt, /Cost on this link/);
+    ev("ACT.metricMode({id:FP,k:'w'})");
+    assert.match(doc.getElementById('panel').textContent, /Cost: the exact number/);
+  }
+  assert.deepEqual(errors, []);
+});
+
+test('a custom metric belongs to the city pair, like the presets, and a standby link keeps it', () => {
+  const { ev, errors } = load();
+  triangle(ev);
+  ev("UI.via=null;openLinkModal('fra','par');ACT.buildLink({tier:1});closeModal();compute()");
+  ev("ACT.setMetric({id:FP,v:'custom'});ACT.metricMode({id:FP,k:'w'});ACT.selLink({id:FP});renderAll();$('metIn').value='65535';ACT.metricSet({id:FP})");
+  const other = ev("S.links.find(l=>l.id!==FP&&edgeKey(l)===FK).id");
+  assert.equal(ev(`pairMet(edgeKey(S.links.find(l=>l.id==='${other}')))`), 'custom', 'the second link between the cities shares it');
+  ev(`ACT.setStandby({id:'${other}',on:1})`);
+  assert.ok(!JSON.parse(ev("hops()")).includes(ev("FP")), 'the pair is still avoided');
+  assert.equal(ev("pmOf().v"), 65535);
+  // Removing every link of the pair drops the metric with it.
+  ev("S.links=S.links.filter(l=>edgeKey(l)!==FK);prunePairMet()");
+  assert.equal(ev("FK in S.pairMet"), false);
+  assert.deepEqual(errors, []);
+});
+
+
+test('overlapping DDoS saves round trip and legacy attacks migrate safely', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.ev.ddos={city:'fra',vec:'dns',gbps:'80',until:7,start:0};delete S.ev.ddosMore;delete S.ddosStarts;S=migrate(JSON.parse(JSON.stringify(S)))");
+  assert.equal(ev('ddosAll().length'), 1);
+  assert.equal(ev('S.ev.ddos.gbps'), 80);
+  assert.equal(ev('S.ev.ddosMore.length'), 0);
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(S.ddosStarts)')), [0]);
+  ev("S.ev.ddosMore=[{id:'overlap',city:'fra',vec:'ack',gbps:50,until:5,start:0,sla:['customer']},null,{city:'bad',vec:'dns'}, {city:'fra',vec:'unknown'}];S.ddosStarts=[0,'bad',Infinity,-9,99];S=migrate(JSON.parse(JSON.stringify(S)))");
+  assert.equal(ev('ddosAll().length'), 2);
+  assert.equal(ev('S.ev.ddosMore[0].id'), 'overlap');
+  assert.deepEqual(JSON.parse(ev('JSON.stringify(S.ddosStarts)')), [0]);
+  ev('S=migrate(JSON.parse(JSON.stringify(S)));compute()');
+  assert.equal(ev('R.ddos.length'), 2);
+  assert.deepEqual(errors, []);
+});
+

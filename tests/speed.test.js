@@ -100,6 +100,52 @@ test('the map draws a big network at every zoom, with a city or a link selected'
   assert.deepEqual(errors, []);
 });
 
+test('the map keeps fiber capacities for one frame only, and skips links above or below the screen', () => {
+  const { ev, errors } = load();
+  bigNet(ev);
+  ev("S.links.push({id:'dfT',a:'fra',b:'ams',kind:'df',own:true,km:kmBetween('fra','ams'),ready:0,ch:['zr4']});compute()");
+  ev('cam.x=CITY.fra.x;cam.y=CITY.fra.y;cam.z=2;draw(0)');
+  assert.equal(ev('DFC'), null, 'nothing is kept between frames');
+  const cap = ev("dfCap(S.links.find(l=>l.id==='dfT'))");
+  ev("S.links.find(l=>l.id==='dfT').ch.push('zr4');draw(0)");
+  assert.equal(ev("dfCap(S.links.find(l=>l.id==='dfT'))"), 2 * cap, 'a new channel counts on the next frame');
+  ev("ctx.fillText=()=>{throw new Error('boom')}");
+  assert.throws(() => ev('draw(0)'));
+  ev('delete ctx.fillText');
+  assert.equal(ev('DFC'), null, 'not even after a frame that failed');
+  // The whole network far above the screen: the links cost nothing, as if there were none.
+  const calls = (body) => ev(`(()=>{cam.x=CITY.fra.x;cam.y=CITY.fra.y+${'2000'};cam.z=2;${body};const n=ctx.calls.n;draw(0);return ctx.calls.n-n;})()`);
+  const withLinks = calls(''), links = ev('JSON.stringify(S.links)');
+  assert.equal(withLinks, calls('S.links=[]'));
+  ev(`S.links=JSON.parse(${JSON.stringify(links)})`);
+  assert.deepEqual(errors, []);
+});
+
+test('a map with more than MAP_BUSY lines on screen leaves out link labels and fiber dots, and they come back', () => {
+  const { ev, errors } = load();
+  bigNet(ev);
+  // Spy on the two things that go: the dotted line on lit fiber and the link labels.
+  ev("window.__dots=0;window.__labels=[];ctx.setLineDash=d=>{if(d.length===2&&d[0]===1&&d[1]===6)__dots++;};ctx.fillText=t=>{if(/ DF$/.test(t))__labels.push(t);}");
+  const frame = () => ev("__dots=0;__labels=[];draw(0);JSON.stringify([__dots,__labels.length])");
+  const view = "cam.x=(CITY.fra.x+CITY.lon.x)/2;cam.y=(CITY.fra.y+CITY.lon.y)/2;cam.z=1.6;";
+  const lines = () => ev("(()=>{const PI=pairIdx();return linesOnScreen(linkGroups().map(g=>linkGeom(g[0],PI.get(edgeKey(g[0])))),visibleKs());})()");
+  ev("const ps=[['fra','ams'],['ams','lon'],['lon','par'],['par','fra'],['fra','lon'],['ams','par']];for(let i=0;i<20;i++){const [a,b]=ps[i%6];S.links.push({id:'dfB'+i,a,b,kind:'df',own:true,km:kmBetween(a,b),ready:0,ch:['zr4']});}compute()");
+  ev(view);
+  assert.ok(lines() < ev('MAP_BUSY'));
+  const [dots, labels] = JSON.parse(frame());
+  assert.ok(dots >= 20 && labels >= 20, 'a normal map shows them');
+  ev("const ps2=[['fra','ams'],['ams','lon'],['lon','par'],['par','fra'],['fra','lon'],['ams','par']];for(let i=20;i<MAP_BUSY+20;i++){const [a,b]=ps2[i%6];S.links.push({id:'dfB'+i,a,b,kind:'df',own:true,km:kmBetween(a,b),ready:0,ch:['zr4']});}compute()");
+  ev(view);
+  assert.ok(lines() > ev('MAP_BUSY'));
+  assert.equal(frame(), '[0,0]', 'a tangle of lines does not');
+  ev("UI.sel={type:'link',id:'dfB3'}");
+  assert.equal(frame(), '[0,1]', 'except the label of the selected link');
+  ev("UI.sel=null;S.links=S.links.filter(l=>!/^dfB/.test(l.id)||+l.id.slice(3)<20);compute()");
+  ev(view);
+  assert.deepEqual(JSON.parse(frame()), [dots, labels], 'back as soon as fewer lines show');
+  assert.deepEqual(errors, []);
+});
+
 test('long lists in the NOC dashboard show 100 rows at a time and grow on request', () => {
   const { ev, errors } = load();
   bigNet(ev);
@@ -182,9 +228,9 @@ test('payday money floaters fade after a long pause instead of piling up', () =>
   run(2000);
   assert.equal(ev('FLOATS.length'), 0, 'floaters from building the network have faded');
   ev('UI.speed=0;__clk+=600000;frame(__clk)');
-  ev('while(S.day%30!==29)dayTick();UI.speed=1;acc=DAY_MS');
+  ev('while(cal(S.day+1).d!==1)dayTick();UI.speed=1;acc=DAY_MS');
   run(16);
-  assert.equal(ev('S.day%30'), 0);
+  assert.equal(ev('cal(S.day).d'), 1, 'the first of a month');
   assert.ok(ev('FLOATS.length') > 0, 'payday shows the money');
   run(2000);
   assert.equal(ev('FLOATS.length'), 0, 'and it fades within two seconds of play');
@@ -226,22 +272,25 @@ test('the map is not drawn while the dashboard covers the whole screen', () => {
 function plainCompute(ev) {
   const src = ev('compute.toString()');
   let plain = src
-    .replace('if(!lst.hi&&ALONE[f.ci])', 'if(false)')
-    .replace('if(!G.length){\n        // One scan', 'if(false){\n        // One scan')
-    .replace('for(const n of e.nets||NET_IDS)', 'for(const n of NET_IDS)')
+    .replace('if(!lst.hi&&ALONE[fci])', 'if(false)')
+    .replace('if(!GN){\n        // One scan', 'if(false){\n        // One scan')
+    .replace('const ns=e.nets||NET_IDS;', 'const ns=NET_IDS;')
     .replace('if(P.dead)return 0;', '').replaceAll('if(r<=1e-6){P.dead=1;return 0;}', '')
-    .replace('if(!P.dead)room-=push(', 'room-=push(').replace(/const gone=e=>\{[^\n]*\};/, 'const gone=e=>false;');
+    .replace('if(!P.dead)room-=push(', 'room-=push(').replace(/const gone=e=>\{[^\n]*\};/, 'const gone=e=>false;')
+    // ...and without what routing keeps between calls (29-route-cache.js): the plain path builds everything afresh.
+    .replace('RCON=RC.on', 'RCON=false');
   // ...and the group split and sorting written the plain way, with array copies, as before they were made allocation-free
   const sg = plain.indexOf('const ROOM=[],sendGroup='), sd = plain.indexOf('const sortD=');
   assert.ok(sg > 0 && sd > sg, 'found the group sender and the sort');
   plain = plain.slice(0, sg) + `const ROOM=[],sendGroup=(g0,i0=0,i1=g0.length)=>{const g=g0.slice(i0,i1);for(const e of g)e.vis=vis;
-    if(g.length>1){const room=g.map(e=>Math.max(0,e.cap-e.used)),tot=room.reduce((a,b)=>a+b,0),want=f.rem;if(tot>1e-6)g.forEach((e,k)=>send(e,want*room[k]/tot));}
-    for(const e of g){if(f.rem<=1e-6)break;send(e,f.rem);}};\n  ` + plain.slice(sd).replace(/^const sortD=a=>\{[^\n]*\};/, 'const sortD=a=>a.sort(byDist);');
+    if(g.length>1){const room=g.map(e=>Math.max(0,e.cap-e.used)),tot=room.reduce((a,b)=>a+b,0),want=FREM[F];if(tot>1e-6)g.forEach((e,k)=>send(e,want*room[k]/tot));}
+    for(const e of g){if(FREM[F]<=1e-6)break;send(e,FREM[F]);}};\n  ` + plain.slice(sd).replace(/^const sortD=\(a,n=a\.length\)=>\{[^\n]*\};/, 'const sortD=(a,n=a.length)=>{const t=a.slice(0,n).sort(byDist);for(let i=0;i<n;i++)a[i]=t[i];};');
   for (const [a, b] of [[src, plain]]) assert.notEqual(a, b);
   assert.equal((plain.match(/if\(false\)/g) || []).length, 2, 'both shortcuts were found and switched off');
   assert.ok(!plain.includes('e.nets||NET_IDS'), 'the exit index was switched off');
   assert.ok(!plain.includes('P.dead'), 'the full-path mark was switched off');
-  assert.ok(plain.includes('const sortD=a=>a.sort(byDist);') && plain.includes('g.forEach('), 'the plain group split and sort are in');
+  assert.ok(plain.includes('RCON=false') && !plain.includes('RC.on'), 'the kept routing tables were switched off');
+  assert.ok(plain.includes('const sortD=(a,n=a.length)=>{const t=a.slice(0,n).sort(byDist);') && plain.includes('g.forEach('), 'the plain group split and sort are in');
   ev('window.__plain=' + plain.replace(/^function compute/, 'function'));
 }
 
@@ -257,7 +306,7 @@ test('fast routing gives exactly the same result as the plain path it replaces',
     for(const c of cs)for(const x of ixIdsIn(c)){try{ACT.buyIx({city:x,tier:1});}catch(e){}if(S.dk&&S.dk.q){S.dk.q=null;closeModal();}if(S.ixp[x]!==undefined&&!S.rs[x])ACT.rs({city:x});}
     compute();for(const n of NETS)for(const c of cs)if(n.pops.includes(c)&&peerOk(n.id,'pni',c).ok&&S.pni.length<150)S.pni.push({id:'p'+n.id+c,net:n.id,city:c,tier:1,n:1});
     for(const n of NETS.filter(n=>n.cache))for(const c of cs.slice(0,15))for(const k of [1,2])S.caches.push({id:'c'+k+n.id+c,city:c,net:n.id,site:'a'});
-    if(S.pni[3])S.pni[3].pref='high';if(S.transit[1])S.transit[1].pref='low';S.te={on:true,day:0};S.nextFail=1e9;S.nextEvent=1e9;`);
+    if(S.pni[3])S.pni[3].pref='high';if(S.transit[1])S.transit[1].pref='low';S.te={on:true,day:0};S.core={lv:2,run:2,legacy:true};S.nextFail=1e9;S.nextEvent=1e9;`);
   const sig = () => ev(`JSON.stringify({served:R.served,demand:R.demand,reach:R.reach,peered:R.peered,teMoved:R.teMoved,egT:R.egT,
     srv:Object.keys(R.citySrv).sort().map(c=>[c,R.citySrv[c]]),load:S.links.map(l=>R.load[l.id]||0),node:Object.keys(R.nodeLoad).sort().map(c=>[c,R.nodeLoad[c]]),
     t:Object.keys(R.useT).sort().map(k=>[k,R.useT[k]]),p:Object.keys(R.usePni).sort().map(k=>[k,R.usePni[k]]),ix:Object.keys(R.useIx).sort().map(k=>[k,R.useIx[k]]),c:Object.keys(R.useCache).sort().map(k=>[k,R.useCache[k]])})`);
@@ -280,11 +329,11 @@ test('Auto-TE routes around a full link exactly like the plain path', () => {
   plainCompute(ev);
   // Frankfurt reaches its only upstream in Amsterdam over a 10G wave, or the long way through Brussels on 800G.
   ev(`ACT.start({});S.cash=1e12;S.lvl=13;for(const g of GOALS)S.done[g.id]=0;for(const c of ['ams','bru'])ACT.buildPop({city:c});
-    for(const c of ['fra','ams','bru']){S.pops[c].rgen=RG.length-1;S.pops[c].routers=RMAX;}if(!S.pops.fra.bb)ACT.launchBB({city:'fra'});S.pops.fra.bb.d=CITY.fra.P*0.8;
+    for(const c of ['fra','ams','bru']){S.pops[c].rgen=RG_TOP;S.pops[c].routers=RMAX;}if(!S.pops.fra.bb)ACT.launchBB({city:'fra'});S.pops.fra.bb.d=CITY.fra.P*0.8;
     const L=(a,b,t)=>{UI.via=null;UI.lmode='wave';UI.route='main';openLinkModal(a,b);ACT.buildLink({tier:t});closeModal();};
     L('fra','ams',0);L('fra','bru',3);L('bru','ams',3);
     S.transit=[];const t=NETS.find(n=>n.price&&n.pops.includes('ams')&&n.type==='t1');ACT.buyTransit({city:'ams',net:t.id,tier:3});
-    S.ixp={};S.pni=[];S.caches=[];S.te={on:true,day:0};S.nextFail=1e9;S.nextEvent=1e9;`);
+    S.ixp={};S.pni=[];S.caches=[];S.te={on:true,day:0};S.core={lv:2,run:2,legacy:true};S.nextFail=1e9;S.nextEvent=1e9;`);
   const sig = () => ev('JSON.stringify({served:R.served,teMoved:R.teMoved,egT:R.egT,load:S.links.map(l=>R.load[l.id]||0),node:R.nodeLoad,t:R.useT})');
   for (const script of ['', 'spill at 70%']) {
     ev(`S.te.script=${JSON.stringify(script)}`);
@@ -294,5 +343,27 @@ test('Auto-TE routes around a full link exactly like the plain path', () => {
     assert.ok(ev('R.teMoved') > 100, 'Auto-TE moved traffic through Brussels');
     assert.ok(ev("R.load[S.links.find(l=>l.a==='fra'&&l.b==='ams').id]") >= (script ? 6.9 : 9.99), 'the direct 10G link is full (up to the spill line)');
   }
+  assert.deepEqual(errors, []);
+});
+
+test('fiber customers are checked by link id the same way with or without the lookup tables', () => {
+  const { ev, errors } = load();
+  ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0;ACT.launchBB({city:'fra'});ACT.buildPop({city:'ams'})");
+  // Dark fibers: one fine, one cut, one waiting for gear, one not built yet, and a second link reusing an id (the first one wins).
+  ev(`(()=>{const sys=Object.keys(DF_SYS)[0],L=(id,o)=>S.links.push({id,a:'fra',b:'ams',kind:'df',sys,km:400,ready:0,ch:[],own:true,...o});
+    L('f1',{});L('f2',{cut:S.day+5});L('f3',{eqDown:S.day+5});L('f4',{ready:S.day+30});L('f1',{cut:S.day+5});
+    let n=0;const B=(type,link,o)=>S.biz.push({id:'b'+(n++),type,link,city:'fra',city2:'ams',bw:1,rate:1,mood:80,reqs:[],...o});
+    for(const l of ['f1','f2','f3','f4','gone'])for(const t of ['wwave','dfpair','pairs'])B(t,l,{slots:t==='wwave'?2:undefined});
+    B('wwave','f1',{slots:3});B('wwave','f1',{});B('dfpair','f3',{});})()`);
+  const r = JSON.parse(ev(`(()=>{const ids=linkIds(),u=fiberUse(),out=[];
+    for(const b of S.biz)if(BIZ_T[b.type].fiber)out.push([b.id,fiberOk(b),fiberOk(b,ids),bizSf(b),bizSf(b,ids)]);
+    for(const l of S.links)if(l.kind==='df')out.push([l.id,soldSlots(l),soldSlots(l,u),freeCh(l),freeCh(l,u),pairFree(l),pairFree(l,u)]);
+    return JSON.stringify(out);})()`));
+  for (const row of r) {
+    const [id, ...v] = row;
+    for (let i = 0; i < v.length; i += 2) assert.equal(v[i + 1], v[i], `${id}: column ${i / 2}`);
+  }
+  assert.ok(r.some((x) => x[0] === 'f1' && x[1] === 5), 'f1 has 5 alien-wave slots sold');
+  assert.ok(r.some((x) => x[1] === true) && r.some((x) => x[1] === false), 'some fibers are up and some are not');
   assert.deepEqual(errors, []);
 });

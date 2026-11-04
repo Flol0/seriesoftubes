@@ -2,7 +2,8 @@
 // Performance benchmark on a very large network (tests/fixtures/big-network.json).
 //
 //   node scripts/perf-bench.js                                  time this checkout
-//   node scripts/perf-bench.js --base OLD.html                  compare OLD.html (e.g. main) with this checkout
+//   node scripts/perf-bench.js --base-ref origin/main           compare main with this checkout (builds main's page)
+//   node scripts/perf-bench.js --base OLD.html                  compare a built page (e.g. a release's) with this checkout
 //   node scripts/perf-bench.js --base OLD.html --md out.md --summary "$GITHUB_STEP_SUMMARY"
 //   node scripts/perf-bench.js --save my-export.json --base OLD.html    a player's save (plain or exported from the menu)
 //   node scripts/perf-bench.js --base OLD.html --browser        also in real Chromium, as a desktop and as a phone
@@ -19,8 +20,14 @@ const { load } = require('../tests/harness');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const ROOT = path.join(__dirname, '..');
-const HEAD = opt('--head', path.join(ROOT, 'site', 'index.html'));
-const BASE = opt('--base', null);
+const page = require('./lib/page');
+// Pages as files: the browser run opens them from disk.
+const HEAD = opt('--head', null) || page.pageFile();
+const BASE = opt('--base', null) || (opt('--base-ref', null) && (() => {
+  const f = path.join(require('node:os').tmpdir(), `tubes-base-${process.pid}.html`);
+  fs.writeFileSync(f, page.assembleRef(opt('--base-ref', null)));
+  return f;
+})());
 const RUNS = +opt('--runs', 15);
 // A plain save, or a file from the in-game "Export save", which wraps it as {app, version, exported, S}.
 const RAW = JSON.parse(fs.readFileSync(opt('--save', path.join(ROOT, 'tests', 'fixtures', 'big-network.json')), 'utf8'));

@@ -1,0 +1,45 @@
+/* Tablets in landscape (and small laptops): slimmer side panels, a tuck-away left panel and
+   bigger touch targets so the map keeps some room in the middle. */
+@media (min-width:761px) and (max-width:1200px){
+  #left{width:272px}
+  #leftTabs{gap:3px;padding-left:6px;padding-right:6px}
+  #leftTabs button{padding-left:6px;padding-right:6px;font-size:12.5px}
+  #panel{width:336px}
+  #left.closed{display:none}
+  #leftToggle{display:flex;position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:4}
+  #leftToggle[hidden]{display:none}
+}
+@media (min-width:761px) and (max-width:1366px) and (pointer:coarse){
+  .b.sm{min-height:32px;padding:5px 11px}
+  .tabs button{min-height:40px}
+  .speed button{min-height:34px}
+}
+/* Mid-size screens: keep the HUD on one row so it never wraps over the side panels. */
+@media (min-width:761px) and (max-width:1360px){
+  #hud{gap:6px}
+  .chip{padding:3px 8px}
+  .speed{gap:3px;padding:4px 5px}
+  .speed button{min-width:29px;font-size:12px}
+}
+@media (min-width:761px) and (max-width:1180px){
+  .hide-md{display:none !important}
+  .brand .val{font-size:17px}
+  .chip .val{font-size:17px}
+}
+@media (min-width:761px) and (max-width:960px){
+  .brand>div{display:none}
+  .brand .caret{display:none}
+  .chip .lbl{font-size:9px}
+  .chip .val{font-size:15px}
+}
+@media (min-width:761px) and (max-width:1040px){
+  .hide-md2{display:none !important}
+  .speed button{min-width:26px;height:28px;font-size:11.5px}
+  .chip{padding:2px 7px}
+}
+
+/* Narrow tablets: a slim find chip and slimmer speed buttons keep the HUD on one row. */
+@media (min-width:761px) and (max-width:860px){
+  #hud .chip.find{width:32px;min-width:32px;font-size:15px}
+  .speed button{min-width:23px;padding-left:2px;padding-right:2px}
+}

@@ -9,6 +9,30 @@ function network(ev) {
   ev("const L=(a,b,t,v)=>{UI.via=v||null;openLinkModal(a,b);ACT.buildLink({tier:t});};L('fra','ams',3);L('fra','par',3);L('ams','lon',2,'uly');closeModal()");
 }
 
+test('gaming offers and signed customers show their DDoS risk in Deals, city panels and customer lists', () => {
+  const { ev, errors, dom } = load();
+  ev("ACT.start({});S.cash=1e9;ACT.buyTransit({city:'fra',net:'cog',tier:1});S.offers=['game','cgame','host'].map(type=>({id:type,city:'fra',name:type,bw:5,rate:100,reqs:[],exp:S.day+30,type}));UI.left='deals';UI.leftOpen=true;renderLeft()");
+  const notes = (root, action) => {
+    const buttons = [...root.querySelectorAll(`[data-act="${action}"]`)];
+    assert.equal(buttons.length, 3);
+    for (const button of buttons) {
+      const id = JSON.parse(button.dataset.args).id;
+      const count = (button.closest('.row').textContent.match(/Gaming attracts attacks/g)||[]).length;
+      assert.equal(count, id==='game'||id==='cgame'?1:0, `risk note for ${id}`);
+    }
+  };
+  assert.equal(ev('gamingCount()'), 0, 'offers disclose future risk before signing');
+  notes(dom.window.document.getElementById('leftBody'), 'accept');
+  ev("selectCity('fra');ACT.tab({t:'cust'})");
+  notes(dom.window.document.getElementById('panelBody'), 'accept');
+  ev("for(const id of ['game','cgame','host'])ACT.accept({id});UI.tab='cust';renderPanel()");
+  assert.equal(ev('gamingCount()'), 2, 'the note uses the same customer classification as the attack calculation');
+  notes(dom.window.document.getElementById('panelBody'), 'dropBiz');
+  ev('ACT.custOpen({})');
+  notes(dom.window.document.getElementById('custSec'), 'custGo');
+  assert.deepEqual(errors, []);
+});
+
 test('event networks pay in full when the crowd is served, nothing up front', () => {
   const { ev, errors } = load();
   seed(ev, 4);
@@ -59,6 +83,29 @@ test('alien waves use spectrum on your dark fiber and pay monthly while it is up
   assert.ok(ev("R.rev.business") > 0);
   ev(`${df}.cut=S.day+3;compute()`);
   assert.equal(ev("bizSf(S.biz.find(b=>b.type==='wwave'))"), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('alien waves a carrier keeps renting on one fiber grow one contract, and old saves are folded', () => {
+  const { ev, errors } = load();
+  network(ev);
+  ev("UI.pending={a:'fra',b:'ams'};UI.lmode='df';UI.dfSys='roadm';ACT.orderDf();UI.lmode='wave';const df=S.links.find(l=>l.kind==='df');df.ready=S.day;ACT.addCh({id:df.id,o:'zr4'})");
+  const df = "S.links.find(l=>l.kind==='df')";
+  const offer = (id, name, slots) => ev(`S.offers.push({...fiberOffer('wwave',${df},()=>'${name}'),id:'${id}',slots:${slots},rate:${slots}*1000});ACT.accept({id:'${id}'})`);
+  offer('w1', 'Megapork', 2); offer('w2', 'Megapork', 3); offer('w3', 'Zay-No Fiber', 1);
+  assert.equal(ev("S.biz.filter(b=>b.type==='wwave').length"), 2, 'one contract per carrier on the fiber');
+  assert.equal(ev("S.biz.find(b=>b.name==='Megapork').slots"), 5);
+  assert.equal(ev("S.biz.find(b=>b.name==='Megapork').rate"), 5000);
+  assert.match(ev("S.biz.find(b=>b.name==='Megapork').what"), /^5× 400G alien waves/);
+  assert.equal(ev(`soldSlots(${df})`), 6, 'the same spectrum is sold as before');
+  ev('compute()');
+  // a save from before: one contract per sale, folded when it loads
+  ev("S.biz.push({id:'o1',type:'wwave',link:S.biz[0].link,name:'Megapork',city:'fra',city2:'ams',bw:1,rate:700,slots:1,mood:80,since:1,reqs:[]});S=migrate(S);compute()");
+  assert.equal(ev("S.biz.filter(b=>b.type==='wwave').length"), 2);
+  assert.equal(ev("S.biz.find(b=>b.name==='Megapork').slots"), 6);
+  assert.equal(ev("S.biz.find(b=>b.name==='Megapork').rate"), 5700);
+  assert.equal(ev("S.biz.find(b=>b.name==='Megapork').mood"), 80, 'the unhappier contract sets the mood');
+  assert.equal(ev(`soldSlots(${df})`), 7);
   assert.deepEqual(errors, []);
 });
 

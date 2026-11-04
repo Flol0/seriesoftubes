@@ -5,7 +5,7 @@ description: Measure and demonstrate the performance of every Series of Tubes ch
 
 # Performance is always demonstrated
 
-Every change to the game (anything in `site/`) shows its performance on a very large network,
+Every change to the game (anything in `src/` or `site/`) shows its performance on a very large network,
 compared with `main`, before it is merged or released. A speed claim without numbers does not
 count, and neither does "it feels fine on my small game". Most players who complain about lag
 have huge late-game networks, and most of them are on phones.
@@ -13,10 +13,13 @@ have huge late-game networks, and most of them are on phones.
 ## Measure
 
 ```bash
-git show origin/main:site/index.html > /tmp/base.html
-npm run perf -- --base /tmp/base.html            # headless only, a few minutes
-npm run perf -- --base /tmp/base.html --browser  # plus real Chromium, desktop and phone (what CI runs)
+npm run perf -- --base-ref origin/main            # headless only, a few minutes
+npm run perf -- --base-ref origin/main --browser  # plus real Chromium, desktop and phone (what CI runs)
 ```
+
+`--base-ref` assembles that commit's page with its own scripts (`node scripts/lib/page.js --ref REF`;
+for commits from before the split it reads their `site/index.html`). `--base FILE` takes a built page
+instead. The head is always this checkout's `src/`, assembled the way the build does it.
 
 `scripts/perf-bench.js` loads `tests/fixtures/big-network.json` (about 100 POPs, 150 links,
 950 PNIs, 830 cache boxes, 110 IX ports, 170 customers) into the base and into this checkout and
@@ -57,7 +60,7 @@ Without `--base` it just times this checkout. `--runs N`, `--md FILE`, `--json F
 save and a file from the in-game menu's Export save work:
 
 ```bash
-npm run perf -- --save ~/Downloads/series-of-tubes-save.json --base /tmp/base.html
+npm run perf -- --save ~/Downloads/series-of-tubes-save.json --base-ref origin/main
 ```
 
 Routing speed-ups must also keep the two equivalence tests green: `tests/speed.test.js` (the fast
@@ -70,10 +73,10 @@ incidents and failures).
 - **Every pull request**: the Performance workflow runs the same comparison and posts the table as a
   comment on the PR (updated on every push). Read it before merging. Locally, paste the table into
   the PR description or the commit summary you report.
-- **Everything you hand back to Frederic** that touched `site/`: include the table, or at least the
+- **Everything you hand back to Frederic** that touched `src/` or `site/`: include the table, or at least the
   rows that moved, in your summary. Say plainly when something got slower.
 - **Before a release**: compare the release against the previous tag
-  (`git show v<last>:site/index.html > /tmp/base.html`) and mention notable changes.
+  (`npm run perf -- --base-ref v<last>`) and mention notable changes.
 
 ## Read the table
 

@@ -1,0 +1,33 @@
+/* Rival exchanges. Big metros rarely have just one IX: challengers undercut the incumbent and
+   share many members with it, but not all. The incumbent keeps the city id, challengers are 'city~n'. */
+const XIX=[
+ {id:'jnb~2',c:'jnb',name:'JINXED-IX',cheap:.7,take:0.5,core:['drz','akm','cfl','tng'],blurb:tr('rival_exchanges.the_older_johannesburg_exchange_run')},
+ {id:'fra~2',c:'fra',name:'KleyWrecks',cheap:.5,take:0.5,core:['drz','akm','cfl','slw','bdc','ydx'],blurb:tr('rival_exchanges.a_smaller_commercial_exchange_down')},
+ {id:'fra~3',c:'fra',name:'Apfelwein-IX',cheap:0.3,take:0.3,blurb:tr('rival_exchanges.a_community_exchange_run_from_above')},
+ {id:'ams~2',c:'ams',name:'NL-Nyx',cheap:0.6,take:0.6,blurb:tr('rival_exchanges.one_fabric_across_the_whole_country')},
+ {id:'ams~3',c:'ams',name:'FRIES-IX',cheap:1,take:0.5,freeTo:1,core:['drz','akm','cfl','slw','msf'],blurb:tr('rival_exchanges.settlement_free_peering_with_frysian')},
+ {id:'lon~2',c:'lon',name:'LO-NAPS',cheap:.6,take:0.5,core:['drz','akm','cfl','slw','bdc','msf','fbk'],blurb:tr('rival_exchanges.member_owned_and_not_for_profit')},
+ {id:'par~2',c:'par',name:'Baguette-IX',cheap:0.55,take:0.5,blurb:tr('rival_exchanges.the_challenger_fresh_every_morning_a')},
+ {id:'mad~2',c:'mad',name:'Paella-NIX',cheap:.6,take:0.5,core:['drz','akm','cfl','tng','bdc','slw','msf'],blurb:tr('rival_exchanges.the_long_established_madrid_exchange')},
+ {id:'mil~2',c:'mil',name:'Aperitivo-IX',cheap:0.5,take:0.45,blurb:tr('rival_exchanges.opens_at_six_comes_with_free')},
+ {id:'ber~2',c:'ber',name:'Club-Mate-IX',cheap:0.35,take:0.4,blurb:tr('rival_exchanges.run_by_hackers_on_caffeine_the')},
+ {id:'waw~2',c:'waw',name:'Bigos-IX',cheap:0.45,take:0.5,blurb:tr('rival_exchanges.warsaw_has_more_exchanges_than')},
+ {id:'waw~3',c:'waw',name:'Zapiekanka-IX',cheap:0.3,take:0.35,blurb:tr('rival_exchanges.open_faced_cheap_and_available_at')},
+ {id:'prg~2',c:'prg',name:'Knedlík-IX',cheap:0.35,take:0.4,blurb:tr('rival_exchanges.dense_filling_and_very_cheap')},
+ {id:'buh~2',c:'buh',name:'Mici-IX',cheap:0.35,take:0.45,blurb:tr('rival_exchanges.grilled_ports_served_with_mustard')},
+ {id:'sto~2',c:'sto',name:'Fika-IX',cheap:0.5,take:0.5,blurb:tr('rival_exchanges.every_session_comes_with_a_coffee')},
+ {id:'kyv~2',c:'kyv',name:'Kyiv-Cake-IX',cheap:0.35,take:0.45,blurb:tr('rival_exchanges.layered_resilient_and_somehow_always')},
+ {id:'nyc~2',c:'nyc',name:'Bagel-IX',cheap:0.6,take:0.5,blurb:tr('rival_exchanges.a_community_exchange_in_a_hudson')},
+ {id:'chi~2',c:'chi',name:'Deep-Dish-IX',cheap:0.6,take:0.5,blurb:tr('rival_exchanges.takes_forever_to_set_up_but')},
+ {id:'sjc~2',c:'sjc',name:'Garage-IX',cheap:0.55,take:0.45,blurb:tr('rival_exchanges.started_in_somebody_s_garage_like')},
+ {id:'lax~2',c:'lax',name:'Smog-IX',cheap:0.6,take:0.45,blurb:tr('rival_exchanges.you_can_t_see_the_fabric')},
+ {id:'sin~2',c:'sin',name:'Kopi-IX',cheap:0.6,take:0.5,blurb:tr('rival_exchanges.strong_sweet_and_cheaper_than_the')},
+ {id:'hkg~2',c:'hkg',name:'Dim-Sum-IX',cheap:0.6,take:0.5,blurb:tr('rival_exchanges.lots_of_small_sessions_on_little')},
+ {id:'mnl~2',c:'mnl',name:'Bayanihan-IX',cheap:0.3,take:0.4,blurb:tr('rival_exchanges.the_whole_neighbourhood_carries_the')},
+ {id:'mnl~3',c:'mnl',name:'In-Vitro-IX',cheap:4.4,take:0.2,core:['pld','smt'],blurb:tr('rival_exchanges.grown_in_a_lab_by_the')},
+ {id:'tok~2',c:'tok',name:'Bento-IX',cheap:0.65,take:0.5,core:['drz','akm','cfl','sgt','msf','amz'],blurb:tr('rival_exchanges.tokyo_has_more_exchanges_than_anyone')},
+ {id:'syd~2',c:'syd',name:'At-The-Edge IX',cheap:.7,take:0.5,core:['drz','nfx','ggl','fbk','akm','cfl','amz','msf','bdc','slw','abb','voc','stb','spl','lpt','npt','mag'],blurb:tr('rival_exchanges.the_challenger_to_ix_straya_pops')},
+ {id:'bom~2',c:'bom',name:'Vada-Pav-IX',cheap:0.45,take:0.45,blurb:tr('rival_exchanges.mumbai_s_street_food_exchange_fast')},
+ {id:'dxb~2',c:'dxb',name:'Shawarma-IX',cheap:0.6,take:0.4,blurb:tr('rival_exchanges.the_challenger_to_the_de_kicks')},
+];
+const XIXM=Object.fromEntries(XIX.map(x=>[x.id,x]));

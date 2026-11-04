@@ -1,0 +1,3 @@
+# The assembler joins src/ byte for byte and refuses CR line endings; keep LF everywhere it reads.
+src/** text eol=lf
+site/i18n/*.js text eol=lf

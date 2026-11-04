@@ -6,6 +6,62 @@ function setup(ev) {
   ev("ACT.start({});S.cash=1e8;for(const g of GOALS)S.done[g.id]=0");
 }
 
+test('Rackstar requests require enough Crowdflare traffic and a free router port', () => {
+  const { ev, errors } = load();
+  setup(ev);
+  ev("S.pops.fra.bb={d:9.9/NSH.cfl};compute();ACT.cache({city:'fra',net:'cfl'})");
+  assert.equal(ev('S.caches.length'), 0, 'below the traffic threshold');
+  ev("S.pops.fra.bb.d=10/NSH.cfl;compute();selectCity('fra');ACT.tab({t:'peer'})");
+  assert.match(ev("document.getElementById('panelBody').textContent"), /Rackstar/);
+  const cash = ev('S.cash');
+  const ports = ev("portsUsed('fra')");
+  ev("ACT.cache({city:'fra',net:'cfl'})");
+  assert.equal(ev('S.caches.length'), 1, 'eligible at exactly 10 Gbps');
+  assert.equal(ev('S.cash'), cash, 'hardware is free');
+  assert.equal(ev("portsUsed('fra')"), ports + 1);
+  assert.equal(ev('R.cost.caches'), ev('CACHE_MO'));
+  ev("while(portsUsed('fra')<portsMax('fra'))ACT.cache({city:'fra',net:'cfl'})");
+  const boxes = ev('S.caches.length');
+  ev("ACT.cache({city:'fra',net:'cfl'})");
+  assert.equal(ev('S.caches.length'), boxes, 'a full router refuses another box');
+  assert.deepEqual(errors, []);
+});
+
+test('Rackstar serves cacheable Crowdflare traffic locally and overflow uses transit', () => {
+  const { ev, errors } = load();
+  setup(ev);
+  ev("S.pops.fra.rgen=RG_TOP;S.pops.fra.bb={d:200/NSH.cfl};ACT.buyTransit({city:'fra',net:'cog',tier:PORT.length-1});ACT.lagT({id:S.transit[0].id,d:1});ACT.lagT({id:S.transit[0].id,d:1});compute()");
+  const transit = ev('R.useT[S.transit[0].id]');
+  const box = "ACT.cache({city:'fra',net:'cfl'});for(const c of S.caches)delete c.g;compute()"; // 100G boxes, as in this test
+  ev(box);
+  assert.equal(ev('R.useCache[S.caches[0].id]'), ev('CACHE_CAP'), 'first box fills to 100G');
+  assert.ok(Math.abs(ev('R.useT[S.transit[0].id]') - (transit - 100)) < 1e-6);
+  ev(box);
+  assert.ok(Math.abs(ev('Object.values(R.useCache).reduce((a,b)=>a+b,0)') - 170) < 1e-6, '85% is cacheable, the rest still needs an external exit');
+  ev("ACT.rmCache({id:S.caches[0].id});ACT.rmCache({id:S.caches[0].id})");
+  assert.ok(Math.abs(ev('R.useT[S.transit[0].id]') - transit) < 1e-6, 'removal returns traffic to transit');
+  assert.deepEqual(errors, []);
+});
+
+test('Rackstar boxes survive save migration and appear on phone peering panels in every language', () => {
+  for (const lang of ['en', 'it', 'pt', 'fr', 'es', 'de']) {
+    const { dom, ev, errors } = load(lang === 'en' ? {} : { lang });
+    setup(ev);
+    ev('window.matchMedia=()=>({matches:true})');
+    ev("S.pops.fra.bb={d:10/NSH.cfl};compute();ACT.cache({city:'fra',net:'cfl'});save();S=migrate(JSON.parse(slotRaw(UI.slot)));compute()");
+    assert.equal(ev("S.caches.filter(x=>x.net==='cfl').length"), 1, lang);
+    assert.ok(ev('R.useCache[S.caches[0].id]') > 0, lang);
+    for (const [width, height] of [[360, 800], [800, 360]]) {
+      dom.window.innerWidth = width;
+      dom.window.innerHeight = height;
+      ev("selectCity('fra');ACT.tab({t:'peer'});renderAll()");
+      assert.match(dom.window.document.getElementById('panelBody').textContent, /Rackstar/, lang);
+    }
+    assert.deepEqual(errors, [], lang);
+    dom.window.close();
+  }
+});
+
 test('big selective peers refuse in some cities, with a reason, and only for a while', () => {
   const { ev, errors } = load();
   setup(ev);
@@ -41,6 +97,26 @@ test('a snubbing peer tears down an existing session and the Request button expl
   assert.ok(ev(`S.log.some(e=>/de-peered you/.test(e.t))`));
   ev(`selectCity('${c}');ACT.tab({t:'peer'})`);
   assert.match(ev("document.getElementById('panelBody').textContent"), /reconsider in/);
+  assert.deepEqual(errors, []);
+});
+
+test('Change Freeze never refuses or tears down a session at an exchange; On-call does', () => {
+  const { ev, errors } = load();
+  setup(ev);
+  const k = ev(`(()=>{const ok=['fra','ams','lon','par','nyc','ash','sjc','sin','tok','hkg'];
+    for(let d=0;d<600;d++)for(const n of NETS)for(const c of ok){if(!ixMembers(c).includes(n.id))continue;
+      S.day=d;const a=snub(n.id,c);S.day=d+1;const b=snub(n.id,c);S.day=0;if(!a&&b)return n.id+'@'+c+'@'+d;}})()`);
+  assert.ok(k, 'found a snub starting at an IX');
+  const [id, c, d] = k.split('@');
+  ev(`S.rules=makeRules('freeze');S.day=${d}`);
+  ev(`ACT.buildPop({city:'${c}'});ACT.buyIx({city:'${c}',tier:1,signed:true});S.peers['${id}@${c}']=true;compute()`);
+  ev('dayTick()');
+  assert.equal(ev(`!!S.peers['${id}@${c}']`), true, 'the session survives the freeze');
+  assert.equal(ev(`snub('${id}','${c}')`), null, 'and nobody refuses a new one');
+  assert.equal(ev(`ixSessions('${c}').has('${id}')`), true);
+  assert.equal(ev('S.stats.depeered||0'), 0);
+  ev(`S.rules=makeRules('oncall');S.day=${+d + 1}`);
+  assert.ok(ev(`!!snub('${id}','${c}')`), 'On-call still snubs the same pair');
   assert.deepEqual(errors, []);
 });
 
@@ -125,15 +201,14 @@ test('a peer at a rival exchange can de-peer you without stopping the game', () 
   assert.deepEqual(errors, []);
 });
 
-test('an IX meltdown at a rival exchange names the city, and a failing day tick does not stop the game', () => {
+test('an IX meltdown at a rival exchange names it, and a failing day tick does not stop the game', () => {
   const { ev, errors } = load();
   ev("ACT.start({});S.cash=1e8;ACT.buildPop({city:'ams'});ACT.buyIx({city:'ams~2',tier:1});S.day=100");
   const src = ev('fireFailure.toString()').replace(/^function fireFailure/, 'function')
-    .replace('let tot=opts.reduce', "opts.splice(0,opts.length,['funny',1]);let tot=opts.reduce")
-    .replace('type=pick(f);}', "type='maxpfx';}");
+    .replace('let tot=opts.reduce', "opts.splice(0,opts.length,['ixloop',1]);let tot=opts.reduce");
   ev('window.__ff=' + src);
   ev('__ff()');
-  assert.match(ev("S.inc.find(i=>i.type==='maxpfx').msg"), /in Amsterdam, is down/);
+  assert.ok(ev("S.inc.find(i=>i.type==='ixloop').msg.includes(ixName('ams~2'))"));
   // a tick that throws is caught, reported once, and the loop keeps going
   ev("const dt0=dayTick;window.dayTick=()=>{throw new Error('boom')};UI.speed=1;acc=DAY_MS;last=0;frame(16);window.dayTick=dt0");
   assert.equal(ev('UI.tickErr'), true);
@@ -145,7 +220,7 @@ test('Amsterdam has FRIES-IX, with free 10G and 100G ports and paid larger ports
   const { ev, errors } = load();
   setup(ev);
   assert.deepEqual(JSON.parse(ev("JSON.stringify(ixIdsIn('ams'))")), ['ams', 'ams~2', 'ams~3']);
-  ev("ACT.buildPop({city:'ams'});S.pops.ams.rgen=RG.length-1;compute()");
+  ev("ACT.buildPop({city:'ams'});S.pops.ams.rgen=RG_TOP;compute()");
   const cash = () => ev('S.cash');
   let c0 = cash();
   assert.equal(ev("ixPortMo('ams~3',0)"), 0, '10G port is free');
@@ -166,7 +241,7 @@ test('Amsterdam has FRIES-IX, with free 10G and 100G ports and paid larger ports
   const txt = ev("document.getElementById('panelBody').textContent");
   assert.match(txt, /FRIES-IX/); assert.match(txt, /HAMS-IX/);
   assert.match(ev("ixBlock('ams~3',true)"), /LAG member <small>free/);
-  ev("save();restored=migrate(JSON.parse(localStorage.getItem('sot-save-v1')));");
+  ev("save();restored=migrate(JSON.parse(slotRaw(UI.slot)));");
   assert.equal(ev("restored.ixp['ams~3']"), 1, 'free port survives save migration');
   assert.equal(ev("restored.ixn['ams~3']"), 2, 'free LAG survives save migration');
   ev("S.ev.ixdown={'ams~3':S.day+2};compute()");
@@ -200,7 +275,7 @@ test('community exchanges are wired up in every city, and Barcelona has Catnip-I
   assert.equal(ev("ixName('bcn')"), 'Catnip-IX');
   for (const k of exchanges) {
     const c = k.split('~')[0];
-    ev(`if(!S.pops.${c})ACT.buildPop({city:'${c}'});S.pops.${c}.rgen=RG.length-1;ACT.buyIx({city:'${k}',tier:1});ACT.rs({city:'${k}'})`);
+    ev(`if(!S.pops.${c})ACT.buildPop({city:'${c}'});S.pops.${c}.rgen=RG_TOP;ACT.buyIx({city:'${k}',tier:1});ACT.rs({city:'${k}'})`);
     assert.equal(ev(`S.ixp['${k}']`), 1, `port at ${k}`);
   }
   ev('compute()');

@@ -8,8 +8,7 @@
 
 ## Performance
 
-<!-- Changes to site/ must show their performance on a big network. The Performance check posts the
+<!-- Changes to src/ must show their performance on a big network. The Performance check posts the
      numbers as a comment on this PR. Locally:
-       git show origin/main:site/index.html > /tmp/base.html
-       npm run perf -- --base /tmp/base.html
+       npm run perf -- --base-ref origin/main
      Explain anything marked slower. -->

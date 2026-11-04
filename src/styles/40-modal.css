@@ -1,0 +1,208 @@
+/* modal */
+.seg.site{margin-top:4px;align-items:center}
+.seg.site .meta{margin-right:4px}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.bdg{border:2px solid #C9CEDD;border-radius:12px;padding:6px 7px;background:#F3F4F8;opacity:.6;display:flex;flex-direction:column;gap:1px;min-width:0}
+.bdg .bi{font-size:20px;filter:grayscale(1)}
+.bdg .bt{font:800 12.5px/1.2 "Baloo 2",sans-serif;color:var(--ink)}
+.bdg .br{font:900 10px Nunito,sans-serif;color:var(--rc);text-transform:uppercase;letter-spacing:.04em}
+.bdg .bd{font-size:11px;color:#5A6280;line-height:1.25}
+.bdg.ever{opacity:.85;border-style:dashed;border-color:var(--rc)}
+.bdg.on{opacity:1;border-color:var(--rc);background:#fff;box-shadow:0 2px 0 var(--rc)}
+.bdg.on .bi,.bdg.ever .bi{filter:none}
+.bdg .bv{font:900 10px Nunito,sans-serif;letter-spacing:.02em}
+.bdg.on.v-freeze{background:linear-gradient(160deg,#F2FBFF,#D6F1FC);border-color:#5BC0EB;box-shadow:0 2px 0 #5BC0EB,inset 0 0 0 2px #fff}
+.bdg.v-freeze .bv{color:#2A8DB8}
+.bdg.on.v-bgp{background:linear-gradient(160deg,#FFF6E8,#FFD9B8);border-color:#FF5A1F;box-shadow:0 2px 0 #C8102E,0 0 8px rgba(255,90,31,.45)}
+.bdg.v-bgp .bv{color:#C8102E}
+.bdg.ever.v-freeze{border-color:#5BC0EB}.bdg.ever.v-bgp{border-color:#FF5A1F}
+.bshelf{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.bsh{font:800 12px Nunito,sans-serif;border:2px solid #C9CEDD;border-radius:999px;padding:2px 9px;background:#fff;white-space:nowrap}
+.bsh.v-freeze{border-color:#5BC0EB}.bsh.v-oncall{border-color:#FFD23F}.bsh.v-bgp{border-color:#FF5A1F}
+.bsh.cur{box-shadow:0 2px 0 var(--ink)}
+.bvt.v-freeze{color:#2A8DB8;font-weight:900}.bvt.v-bgp{color:#FF5A1F;font-weight:900}
+.scn{display:flex;gap:10px;align-items:center;border:2px solid #DDE1EC;border-radius:12px;padding:8px 10px;margin-top:8px}
+.scn.wk{border-color:var(--me);background:#FFF0F6}
+.scn .nm{font-weight:900}
+.term{background:#1E2640;color:#7CFFB2;font:600 12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:10px 12px;border-radius:10px;overflow-x:auto;white-space:pre;margin:8px 0}
+.trsel{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:8px}
+.trsel label{display:flex;flex-direction:column;font:800 12px Nunito,sans-serif;gap:2px}
+.trsel select{font:700 14px Nunito,sans-serif;padding:4px 6px;border:2px solid var(--ink);border-radius:8px;max-width:240px}
+.fact.trb{cursor:pointer;font:inherit;border:2px solid var(--ink);background:#fff}
+#coach{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);z-index:16;width:min(520px,calc(100% - 24px));background:#fff;border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:8px 10px;display:flex;gap:8px;align-items:center}
+#coach .ct{flex:1;font-weight:800;font-size:14px;line-height:1.35}
+#coach .cs{display:block;font:900 10px Nunito,sans-serif;color:var(--me);text-transform:uppercase;letter-spacing:.05em}
+.coach-glow{animation:coachglow 1s ease-in-out infinite;position:relative;z-index:2}
+@keyframes coachglow{0%,100%{box-shadow:0 0 0 0 rgba(255,79,154,.9)}50%{box-shadow:0 0 0 6px rgba(255,79,154,.35)}}
+@media (prefers-reduced-motion:reduce){:root:not(.anim-force) .coach-glow{animation:none;outline:3px solid #FF4F9A}}
+:root.no-anim .coach-glow{outline:3px solid #FF4F9A}
+.setline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0}
+.setline>span,.setline>label{font-weight:800}
+/* Title screen: the big start button across the top, the three others below it, all the same size. */
+.btns.tcta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.btns.tcta .b{margin:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;white-space:normal;hyphens:auto;-webkit-hyphens:auto;min-height:40px;padding:4px 6px;font-size:14px}
+.btns.tcta .b.big{grid-column:1/-1;font-size:18px;padding:7px 18px 5px}
+/* Dropdowns that look like the game's buttons. 16px text: iOS zooms into anything smaller when it is tapped. */
+select.pick{-webkit-appearance:none;appearance:none;font:800 16px var(--display);color:var(--ink);background:var(--soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231E2640' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;border:3px solid var(--ink);border-radius:12px;padding:6px 36px 6px 12px;min-height:44px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
+select.pick:focus-visible{outline:3px solid #FF4F9A;outline-offset:2px}
+label.f+select.pick{width:100%}
+.thb{font:inherit;font-weight:900;background:none;border:0;padding:0;cursor:pointer;color:inherit}
+.ttop{margin:4px 0;padding:4px 8px;border-left:3px solid #FF8A3D;background:#FFF6EC;border-radius:6px}
+.ibx{border:2px solid var(--line,#DDE3EE);border-radius:12px;padding:8px 10px;margin:8px 0;background:#fff}.ibx .nm{font-weight:800}
+.aibtn{background:linear-gradient(90deg,#8E5CF7,#E84FA8);color:#fff}.aisay{background:#F3ECFF;border:2px solid #8E5CF7;border-radius:10px;padding:8px 10px;color:var(--ink)}
+.tehelp h3{margin:14px 0 4px}.tehelp ul{margin:4px 0;padding-left:18px}.tehelp li{margin:4px 0;font-size:13.5px;line-height:1.4}.tehelp dt{margin-top:8px}.tehelp dd{margin:2px 0 0;font-size:13px;line-height:1.4;color:var(--ink2)}.tehelp code{font:600 12.5px ui-monospace,Menlo,Consolas,monospace;background:#1E2640;color:#E6F0FF;border-radius:6px;padding:1px 6px;word-break:break-word}
+.terec{display:flex;align-items:center;gap:10px;justify-content:space-between;border-top:2px dashed var(--line,#DDE3EE);padding:8px 0}.terec .btn{flex:none}
+.tecode{width:100%;box-sizing:border-box;font:600 13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#1E2640;color:#E6F0FF;border:3px solid var(--ink);border-radius:10px;padding:10px;margin-top:8px;resize:vertical;tab-size:2}
+.term.err{color:#FF9AA5}
+.menu-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.menu-list .b{justify-content:space-between;width:100%}
+#mega{position:fixed;left:0;right:0;bottom:0;z-index:17;background:#7A86B8;border-top:3px solid var(--ink);overflow:hidden;white-space:nowrap;pointer-events:none;animation:megaflash 1.2s steps(2) infinite}
+#mega .mtrack{display:inline-block;padding:7px 0;animation:megascroll 40s linear infinite;font:900 16px "Baloo 2",sans-serif;color:#fff;text-shadow:0 2px 0 var(--ink)}
+#mega span{margin:0 28px}
+#mega span::after{content:"🐘";margin-left:56px}
+@keyframes megascroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes megaflash{0%{background:#7A86B8}50%{background:#FF4D5E}}
+@media (prefers-reduced-motion:reduce){#mega,#mega .mtrack{animation:none}}
+#update{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 70px);z-index:18;width:min(520px,calc(100% - 24px));pointer-events:auto}
+#update .b{pointer-events:auto}
+.notes{margin:10px 0 0;padding-left:20px;line-height:1.5}
+.notes li{margin:4px 0}
+.story{margin:10px 0 0;line-height:1.5}
+.story p{margin:0 0 10px}
+.story b{font-weight:900}
+#bankBox{position:fixed;inset:0;background:rgba(30,38,64,.35);z-index:16;overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) 16px max(12px,env(safe-area-inset-left,0px))}
+#bankCard{max-width:760px;margin:0 auto;padding:16px 18px 18px;background:var(--paper)}
+.menubtn{cursor:pointer;text-align:left;font:inherit;border-color:var(--ink)}
+.menubtn .caret{font-size:13px;margin-left:2px;opacity:.85}
+.cashbtn{cursor:pointer;text-align:left;font:inherit;color:inherit;position:relative}
+.cashbtn .badge{position:absolute;top:-8px;right:-8px;background:var(--me);color:#fff;border:2.5px solid var(--ink);border-radius:10px;font:900 11px Nunito,sans-serif;padding:0 6px;line-height:16px}
+.loan{border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;margin-top:10px;display:flex;gap:10px;align-items:flex-start}
+.loan .grow{flex:1;min-width:0}
+.loan .terms{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.grade{font-family:var(--display);font-weight:800;font-size:30px;line-height:1;border:3px solid var(--ink);border-radius:12px;padding:4px 10px;background:var(--sun)}
+#dash{position:fixed;inset:0;background:rgba(30,38,64,.35);z-index:15;overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) 16px max(12px,env(safe-area-inset-left,0px))}
+#dashCard{max-width:980px;margin:0 auto;padding:16px 18px 18px;background:var(--paper)}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0}
+.tile{border:2.5px solid var(--ink);border-radius:13px;padding:6px 10px;background:var(--soft)}
+.tile .lbl{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.tile .val{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .sub{font-size:11.5px;color:var(--ink2);font-weight:700}
+.dcols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
+@media (max-width:760px){.dcols{grid-template-columns:minmax(0,1fr)}}
+.panel2{border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;min-width:0}
+.panel2 h3{font-size:17px;margin-bottom:4px}
+.chart{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;font-weight:800;color:var(--ink2);margin-top:4px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;border:1.5px solid var(--ink);margin-right:5px;vertical-align:-1px}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.tbl th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2);padding:4px 6px;border-bottom:2px solid var(--ink)}
+.tbl td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl td.r,.tbl th.r{text-align:right}
+.mix{display:flex;height:10px;width:100px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--paper)}
+.mix i{display:block;height:100%}
+/* The NOC's traffic table has a row per network: classes, not inline styles, keep its hundreds of rows cheap to parse. */
+.nmc{display:inline-flex;align-items:center;gap:6px}.dlost{color:var(--bad)}.b.pall{display:block;margin-top:5px}
+.tscroll{overflow-x:auto}
+#modal{position:fixed;inset:0;background:rgba(30,38,64,.45);display:grid;place-items:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+#modal .card{width:min(560px,100%);max-height:calc(100% - 20px);overflow:auto;padding:20px 22px}
+.title-art{display:flex;align-items:center;gap:14px}
+.title-art h1{font-family:var(--display);font-weight:800;font-size:clamp(34px,7vw,52px);line-height:.95;margin:0;letter-spacing:-.01em}
+.title-art h1 span{color:var(--me)}
+.tagline{color:var(--ink2);font-size:14.5px;line-height:1.45;margin:10px 0 14px}
+label.f{display:block;font-weight:900;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);margin:12px 0 5px}
+input.t{width:100%;box-sizing:border-box;border:3px solid var(--ink);border-radius:12px;padding:8px 12px;font-family:var(--display);font-weight:800;font-size:18px;background:var(--soft);color:var(--ink);-webkit-text-fill-color:var(--ink)}
+.network-name{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.network-name{flex-wrap:nowrap}.nmwrap{position:relative;flex:1 1 auto;min-width:0}.nmwrap input.t{width:100%;padding-right:44px;font-size:16px}
+.reroll{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:2px solid var(--ink);background:#22C47A;color:#fff;font:900 18px/1 var(--display);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}.reroll:active{transform:translateY(-50%) rotate(-90deg)}
+.asnwrap{display:flex;align-items:center;gap:4px;flex:0 0 auto;font:800 14px var(--display);color:var(--ink2)}.asnwrap input.t{width:92px;font-size:15px;padding:8px 6px}.asnwrap input.t::placeholder{color:var(--ink2);opacity:.7}.asnwrap input.t.bad{border-color:#E03A3A;background:#FFE8E8}
+.metric-in{display:flex;gap:6px;align-items:center;margin-top:6px}.metric-in input.t{flex:1 1 120px;width:auto;min-width:0;font-size:16px;padding:4px 10px}
+.plug{display:flex;gap:12px;align-items:center;border:3px solid var(--ink);border-radius:14px;padding:10px 12px;margin:10px 0 4px;background:var(--soft);box-shadow:0 3px 0 var(--ink);color:var(--ink);text-decoration:none}
+.plug:hover{background:#FFF6D6}.plug .pi{font-size:30px;line-height:1}.plug b{font-family:var(--display);font-size:16px}.plug .meta{display:block;margin-top:2px}.plug .go{margin-left:auto;font-weight:900;white-space:nowrap}
+.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.starts .start:last-child:nth-child(odd){grid-column:1/-1}
+.start{border:3px solid var(--ink);border-radius:14px;padding:8px 10px;background:var(--paper);cursor:pointer;text-align:left;box-shadow:0 3px 0 var(--ink)}
+.starts.one{grid-template-columns:1fr}
+.start.on{background:#FFE3F0;border-color:var(--me);box-shadow:0 3px 0 var(--me)}
+.start b{font-family:var(--display);font-size:17px;display:block}
+.start span{font-size:12px;color:var(--ink2);line-height:1.3;display:block}
+/* Home cities: compact tiles stacked in one column, the dropdown for any other city last. */
+/* Title screen doors (modes), Normal's presets and Sandbox's chaos: chunky sticker tiles, one tap each. */
+.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.door,.preset,.chs{position:relative;border:3px solid var(--ink);border-radius:16px;background:var(--paper);box-shadow:0 4px 0 var(--ink);cursor:pointer;text-align:left;padding:9px 11px 8px;display:flex;flex-direction:column;gap:1px;min-width:0;transition:transform .08s ease,box-shadow .08s ease}
+.door:active,.preset:active,.chs:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.door i,.preset i,.chs i{font-style:normal;font-size:26px;line-height:1.1}
+.door b,.preset b,.chs b{font-family:var(--display);font-size:18px;line-height:1.1}
+.door span,.preset span,.chs span{font-size:12.5px;color:var(--ink2);line-height:1.3}
+.door.on,.preset.on,.chs.on{background:#FFE3F0;border-color:var(--me);box-shadow:0 4px 0 var(--me)}
+.door.on::after,.preset.on::after,.chs.on::after{content:"✓";position:absolute;top:6px;right:9px;font:900 15px var(--display);color:var(--me)}
+.door[data-door=puzzle],.door[data-door=scn]{background:var(--soft)}
+.presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.preset small{font-size:11px;color:var(--ink2);line-height:1.3;margin-top:4px;border-top:2px dashed var(--line);padding-top:4px}
+.preset[data-preset=bgp].on{background:#FFE9D6;border-color:#FF6A2B;box-shadow:0 4px 0 #FF6A2B}.preset[data-preset=bgp].on::after{color:#FF6A2B}
+.preset[data-preset=freeze].on{background:#E2F5FF;border-color:var(--sea2);box-shadow:0 4px 0 var(--sea2)}.preset[data-preset=freeze].on::after{color:var(--sea2)}
+.chaos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.chs{padding:7px 8px 6px}.chs i{font-size:20px}.chs b{font-size:15px}.chs span{font-size:11px}
+.lockn{margin:8px 0 0}
+.starts.homes{display:flex;flex-direction:column;gap:6px}
+.homes .start{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:2px;padding:6px 12px;box-shadow:0 2px 0 var(--ink)}
+.homes .start.on{box-shadow:0 2px 0 var(--me)}
+.homes .start b{font-size:16px;flex:0 0 8.4em}
+.homes .start span{flex:1 1 10em;min-width:0}
+.homes .start.own select.pick{flex:1 1 100%;margin:4px 0 2px;min-height:40px;font-size:16px;box-shadow:none;border-width:2px;padding-right:30px;background-position:right 9px center}
+/* In Settings it sits next to small On/Off pills: same 16px text, slimmer frame. */
+.setline select.pick{min-height:36px;padding:4px 30px 4px 10px;border-width:2px;border-radius:10px;box-shadow:0 2px 0 var(--ink);background-position:right 9px center}
+.tiers{display:grid;gap:7px;margin-top:10px}
+.tierbtn{display:flex;align-items:center;gap:10px;border:3px solid var(--ink);border-radius:13px;padding:8px 12px;background:var(--paper);cursor:pointer;box-shadow:0 3px 0 var(--ink);text-align:left}
+.tierbtn:hover{background:#FFF6CF}
+.tierbtn:disabled{opacity:.4;cursor:not-allowed}
+.tierbtn .sz{font-family:var(--display);font-weight:800;font-size:22px;width:70px}
+.tierbtn .grow{flex:1}
+.tierbtn .pr{font-family:var(--display);font-weight:800;font-size:18px}
+.gl dt{font-family:var(--display);font-weight:800;font-size:16px;margin-top:10px}
+.gl dd{margin:2px 0 0;color:var(--ink2);line-height:1.45;font-size:13px}
+.kbd{display:inline-block;border:2px solid var(--ink);border-radius:6px;padding:0 5px;font-weight:900;font-size:11px;background:var(--soft)}
+.keylist{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;margin:14px 0 0}
+.keylist dt{margin:0;white-space:nowrap}.keylist dd{margin:0;color:var(--ink2);font-size:14px}
+.keylist .kbd{font-size:13px;padding:1px 7px;min-width:12px;text-align:center}
+.keylist .keytab{display:inline-block;margin:6px 10px 0 0;white-space:nowrap}
+
+/* "Your networks" on the title screen: one big tap target per network, a small ⋯ for export and delete. */
+.slots{display:flex;flex-direction:column;gap:7px;margin-bottom:6px;max-height:min(46vh,330px);overflow:auto;padding:2px 2px 5px}
+.slot{display:flex;align-items:stretch;border:3px solid var(--ink);border-radius:16px;background:var(--paper);box-shadow:0 4px 0 var(--ink);flex:none;transition:transform .08s ease,box-shadow .08s ease}
+.slot:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.slot.top{background:#FFE3F0;border-color:var(--me);box-shadow:0 4px 0 var(--me)}
+.slot.busy{background:var(--soft);border-style:dashed}
+.slot.broken{opacity:.75;border-style:dashed}
+.slot-go{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:none;border:0;padding:8px 6px 8px 11px;font:inherit;color:inherit;text-align:left;cursor:pointer;min-height:52px}
+.slot-go>i{font-style:normal;font-size:26px;line-height:1;flex:none}
+.slot .sn{flex:1;min-width:0;display:flex;flex-direction:column}
+.slot .sn b{font-family:var(--display);font-size:18px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .sn small,.slot .sm small{font-size:12px;color:var(--ink2);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .tag{align-self:flex-start;font:900 10px var(--body);text-transform:uppercase;letter-spacing:.05em;color:var(--me);line-height:1.2}
+.slot.busy .tag{color:var(--ink2)}
+.slot .sm{flex:none;display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.slot .sm em{font:800 15px var(--display);font-style:normal}
+.slot-more{flex:none;width:44px;border:0;border-left:2px dashed var(--line);background:none;font:900 22px var(--display);color:var(--ink);cursor:pointer;border-radius:0 13px 13px 0}
+.slot-more:hover,.slot-go:hover{background:rgba(255,79,154,.06)}
+.slot-go:focus-visible,.slot-more:focus-visible{outline:3px solid #FF4F9A;outline-offset:-3px}
+.ibx.space{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ibx.space .btns{margin:0}
+h2 .rn{font-size:18px;vertical-align:middle;padding:2px 4px}
+/* Title: language first, compact presets, one drawer for the home city (2.0) */
+.tlang{display:flex;justify-content:flex-end;margin:-4px 0 4px}.tlang .pick{width:auto;max-width:60%}
+.presets .preset{flex-direction:row;align-items:center;gap:6px;padding:6px 10px 5px}.presets .preset i{font-size:20px}.presets .preset b{font-size:15px}
+.presets .preset.on::after{display:none}#presetWhat{margin:6px 0 0}
+.homepick{width:100%}
+.tcont .b{white-space:normal;max-width:100%;overflow-wrap:anywhere;line-height:1.15}
+#modalCard{overflow-x:hidden}
+.menu-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.mtile{border:3px solid var(--ink);border-radius:14px;background:var(--paper);box-shadow:0 3px 0 var(--ink);padding:8px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:800 13px/1.15 var(--display);color:var(--ink);text-align:center;min-height:68px;justify-content:center}
+.mtile i{font-style:normal;font-size:22px;line-height:1}.mtile:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.menu-links{margin:12px 0 0;text-align:center;line-height:2;color:var(--ink2)}
+.menu-links .lnk{background:none;border:0;padding:4px 2px;font-weight:700;font-size:14px;font-family:inherit;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.menu-plugs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.mplug{border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-weight:700;font-size:13px;line-height:1.25;color:var(--ink);text-decoration:none;background:var(--soft);display:flex;align-items:center}
+/* Find a city: big tap targets, the first result (what Enter picks) highlighted. */
+.findlist{margin-top:8px}
+.findrow{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);font:inherit;color:var(--ink);min-height:48px;padding:6px 8px;cursor:pointer;border-radius:0}
+.findrow .nm,.findrow .meta{display:block}
+.findrow.on{background:var(--soft);border-radius:10px}
+.findrow:hover{background:var(--soft)}
