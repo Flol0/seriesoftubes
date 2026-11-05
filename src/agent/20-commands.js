@@ -415,6 +415,7 @@ const API_CMD={
 
 const API_VIEW={
  traceMode:{args:[['m','string']],doc:'Redo the open traceroute in a routing mode: normal, fast or scenic.'},
+ chartToggle:{args:[['c','string'],['k','string']],doc:'Hide or show one series of a dashboard chart (a legend click); hiding every series shows them all again.'},
  help:{args:[],doc:'Open the how-to-play modal.'},
  dash:{args:[],doc:'Open the NOC dashboard.'},
  dashClose:{args:[],doc:'Close the NOC dashboard.'},
@@ -470,6 +471,7 @@ const API_VIEW={
  pzFinish:{args:[],doc:'Puzzles only: run the star count and show the results sheet.'},
  pzMonkey:{args:[],doc:'Puzzles only: send the chaos monkey round the build to prove the N-1 star.'},
  pzMkSkip:{args:[],doc:'Puzzles only: skip the monkey\'s tour to the verdict.'},
+ pzLook:{args:[['c','cityId',false],['u','string',false]],doc:'Puzzles only: move the map to the city (c) or the cut (u, a link unit) that the sheet\'s next line names.'},
  pzArAll:{args:[],doc:'Architect runs only: show every city on the map, not just the run\'s own.'},
  tailTog:{args:[],doc:'Show or hide the long tail of small networks.'},
  teEdit:{args:[],doc:'Open the RouteScript editor.'},
@@ -549,6 +551,6 @@ const API_DENY={
   start:'start',newgame:'start',cont:'start',toTitle:'start',resetAsk:'start',
   exportSave:'files',importGo:'files',importPick:'files',slotExport:'files',
   slotBack:'slots',slotDel:'slots',slotDelGo:'slots',slotMenu:'slots',slotRetry:'slots',slotSpace:'slots',slotSwitch:'slots',slotTake:'slots',
-  animSet:'prefs',langSet:'prefs',menu:'prefs',mute:'prefs',prefSet:'prefs',settings:'prefs',settingsClose:'prefs',soundSet:'prefs',vpSet:'prefs',
+  animSet:'prefs',langSet:'prefs',mapSet:'prefs',menu:'prefs',mute:'prefs',prefSet:'prefs',settings:'prefs',settingsClose:'prefs',soundSet:'prefs',vpSet:'prefs',
   install:'browser',share:'browser',shareDl:'browser',shareGo:'browser',traceCopy:'browser',updateLater:'browser',updateNow:'browser',wsShare:'browser',pzShare:'browser',
 };

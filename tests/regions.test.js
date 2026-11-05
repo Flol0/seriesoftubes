@@ -796,7 +796,7 @@ test('Atlantic islands and Halifax: real landings, real exchanges only, and isla
   const hop = (path) => ev(`Math.min(...${JSON.stringify(path)}.slice(1).map((c,i)=>Math.max(...cablesFor(${JSON.stringify(path)}[i],c).map(p=>subCarrier(p.km)))))`);
   const direct = (a, b) => ev(`Math.max(...cablesFor('${a}','${b}').map(p=>subCarrier(p.km)))`);
   assert.equal(direct('mia', 'mad'), 1200);
-  assert.equal(hop(['mia', 'bda', 'pdl', 'mad']), 1600, 'Florida to Spain via Bermuda and the Azores');
+  assert.equal(hop(['mia', 'bda', 'pdl', 'bio']), 1600, 'Florida to Spain via Bermuda and the Azores');
   assert.equal(hop(['mia', 'pdl', 'lis']), 1600, 'Florida to Lisbon via the Azores');
   assert.equal(direct('atn', 'lis'), 1200);
   assert.equal(hop(['atn', 'bda', 'lis']), 1600);
@@ -819,9 +819,9 @@ test('Atlantic islands and Halifax: real landings, real exchanges only, and isla
   assert.ok(ev('!!S.pops.pdl') && ev('S.lvl') >= 4);
   assert.equal(ev('scnProg().items.length'), 3);
   assert.equal(ev("fastPath('mia','mad',1600)"), false);
-  ev("S.cash=1e9;for(const c of ['mia','bda','mad','lis','tci','lag']){ACT.buildPop({city:c});S.pops[c].rgen=3;}S.pops.pdl.rgen=3;");
+  ev("S.cash=1e9;for(const c of ['mia','bda','mad','bio','lis','tci','lag']){ACT.buildPop({city:c});S.pops[c].rgen=3;}S.pops.pdl.rgen=3;");
   const wave = (a, b, via) => ev(`UI.via='${via}';UI.route='same';openLinkModal('${a}','${b}');ACT.buildLink({tier:4});closeModal();S.links.length`);
-  wave('mia', 'bda', 'sol'); wave('bda', 'pdl', 'sol'); wave('pdl', 'mad', 'sol'); wave('lis', 'tci', 'ace'); wave('tci', 'lag', 'twoaf');
+  wave('mia', 'bda', 'sol'); wave('bda', 'pdl', 'sol'); wave('pdl', 'bio', 'sol'); wave('bio', 'mad', null); wave('lis', 'tci', 'ace'); wave('tci', 'lag', 'twoaf');
   ev('compute()');
   assert.equal(ev("fastPath('mia','mad',1600)"), true);
   assert.equal(ev("fastPath('lis','lag',1600)"), true);
@@ -1010,7 +1010,8 @@ test('Down Under: routers upside down, BrisVegas, Next-Door-DC and everything tr
   assert.equal(ev("S.log.filter(e=>/Router installed/.test(e.t)).length"), 2, 'one note per Australian POP');
   ev("ACT.buildPop({city:'lon'})");
   assert.equal(ev("S.log.filter(e=>/Router installed/.test(e.t)).length"), 2, 'London routers stay the right way up');
-  const turns = c => ev(`(()=>{let n=0;const r=ctx.rotate;ctx.rotate=a=>{if(Math.abs(a-Math.PI)<1e-9)n++;return r.call(ctx,a);};try{const C=CITY['${c}'];drawCity(C,100,100,1,0);}finally{ctx.rotate=r;}return n;})()`);
+  // The picture of a city is painted once per state (citySprite), so the turn is checked on its static part.
+  const turns = c => ev(`(()=>{let n=0;const r=ctx.rotate;ctx.rotate=a=>{if(Math.abs(a-Math.PI)<1e-9)n++;return r.call(ctx,a);};try{const C=CITY['${c}'],t=cTier(C.id);cityStatic(C,S.pops[C.id],t,1,1,{sel:0,dd:0,gl:-1},{down:false,feed:false,sel:false,inc:false,ixDraw:false,ixHot:false});}finally{ctx.rotate=r;}return n;})()`);
   assert.equal(turns('syd'), 1, 'Sydney: upside down');
   assert.equal(turns('lon'), 0, 'London: the right way up');
   // BrisVegas, Megapork's home town, and the data centres
