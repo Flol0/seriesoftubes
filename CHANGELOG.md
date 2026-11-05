@@ -6,9 +6,23 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
-## [2.8.0-qol.1] — 2026-11-04
+## [2.9.1] — 2026-11-04
 
-- Updated to upstream 2.8.0. Keeps the NOC wallboard, phone and tablet second-tab support, installed-iOS display fixes and audio recovery.
+- Jokes in the game now poke fun at networks, cables and routers, never at people, countries or beliefs. A few networks have new names (Atlas Hold-the-Line Telecom, Star-Blink, Telekom Malay-tency, Oh Yas Sénégal, Afghan Tele-Pass, Island-Hop Micronesia, Tel-One-derful, Tango Two-Step), so do three of the names for your own cables, and about forty descriptions of networks, cities, cables and events were rewritten.
+- A network operators' meeting that hires you for its event network now meets only where it really does: NANOG in the United States, APRICOT in Asia Pacific and Oceania (not mainland China or Hong Kong), DENOG in Germany, UKNOF in the UK, RIPE in Europe, the Middle East and Africa, and DKNOG in Copenhagen.
+- North Korea now moves well under 1 Gbps, and no customer of any kind calls from there.
+
+## [2.9.0] — 2026-11-04
+
+- In Architect runs, a diverse second tube now takes the cheapest other route, as a new tube does, so the Euro Run's plain plan fits its budget again. A failed review also says that every site still connected after a cut needs room for its traffic, not only the mission-critical ones (#282).
+- A new button next to the speed controls opens a NOC screen in a window of its own, to keep on a second display beside the map. It is a dark wallboard with a live world map of your links and POPs, traffic and money graphs, alarms, and your hottest ports with their upgrade buttons, which work on the running game; click a POP to see its ports. Details has the full dashboard, and Full screen fills the display. The new window only shows and sends clicks: your network is still played and saved in the game window. Phones do not show the button.
+- Cities of one country on one piece of land can be joined by fiber over land, even where there is no road: Pevek to Anadyr or Moscow, Juneau to Seattle, Nuuk to Sisimiut. Inside one country, crossing from Europe into Asia (Moscow–Vladivostok, Istanbul–Ankara) is no longer priced as a crossing between continents.
+- No circuit of any kind can be built between North and South Korea, and nothing leaves South Korea over land: every way out is a subsea cable.
+- The map zooms in twice as far, for crowded regions like New England or around Washington.
+- Cable ships at anchor sit a little further out from their port, and a tap on a city picks the city even with a ship close by.
+- With a credit rating of AA or better you can now call a bank from the Bank window and ask for the amount you need. The better your rating, the lower the rate and the more they will lend, up to a limit based on your revenue and what you already owe, but weird conditions always apply. (#251)
+- Agents playing through the Agent API can no longer start a link in a city where you have no POP, just as on the map. Before, an agent could sign a dark fiber IRU, lease a wave or lay a cable from such a city; now it is told why, and so is its dry run.
+- Build POP in a small city that is off the map now says why it can't, and names a city nearby to build in instead. Founding your own exchange where you can't (mainland China, a city that already has one, a city with no POP) says why too. Before, both did nothing without a word, and an agent's dry run quoted a price.
 
 ## [2.8.0] — 2026-11-04
 
@@ -26,11 +40,6 @@ All notable changes to this project are documented here. The project follows
 - Every capital in the Americas is on the map: the eastern Caribbean islands, Central America, Haiti, Guyana, Suriname and Bolivia's constitutional capital Sucre. The islands land the real cables (ECFS and Southern Caribbean Fiber), Flow and Digicel serve all of them, and Belize, Guyana, Suriname and Haiti get their own national telcos.
 - Every US state capital and Washington, DC are on the map, with every Canadian provincial and territorial capital and Greenland. Greenland's capital Nuuk and three towns up the coast hang on the real Greenland Connect cables; Iqaluit has only satellites, so land your own cable there. New carriers sell transit in the north and the Canadian provinces, and exchanges sit only where real ones do.
 - If you run the game on your own computer, an AI agent can now play it in your browser while you watch. Turn the Agent API on in Settings (the section only appears in a copy of the game you run with npm run dev, never on seriesoftub.es) and point an AI client at the game's MCP server: every move happens live on your screen, and docs/MCP.md in the repository explains the setup. You choose the clock: a pace from one simulated day every 30 seconds to 5 minutes, which nobody can pause and which waits while no agent is connected, or the agent moves time itself. Your game, your settings and the windows you open stay yours.
-## [2.7.0-qol.1] — 2026-11-04
-
-- Updated to upstream 2.7.0 and current main. Replaced the fork’s single-link trial with the upstream implementation; retained installed-iOS display and audio recovery fixes.
-- Open a live NOC wallboard in another tab: dark full-screen display, six metrics, a network map coloured by port load, alarms, traffic history and the hottest ports with checked upgrades. The game tab owns the save and clock; the wallboard reconnects without opening a second game, including on iPad and iPhone. Based on upstream PR #279, with a touch-friendly second-tab entry, a bounded background clock and POP colours based on the hottest port.
-
 ## [2.7.0] — 2026-11-03
 
 - Three new cities in northern Australia: Port Hedland, Townsville and Alice Springs (#255). Port Hedland lands a new cable up the coast to Darwin and a branch of Darwin's cable out to Singapore; Alice Springs has no sea at all. In the wet season, November to April, fiber cuts in the tropical north, Darwin included, take twice as long to reach.
@@ -333,7 +342,7 @@ And in On-call and BGP at 3 a.m., a **chaos monkey** sometimes moves into your n
 - Come chat with other players in the new Series of Tubes Signal group. It's linked from the title screen, the menu and How to play: share screenshots, report bugs and argue about peering policy.
 - RouteScript speaks more BGP. `prefer transit` and `avoid transit` set which upstream goes first, like local-pref, `prepend transit PROVIDER 1-3` moves part of an upstream's traffic away, the way AS-path prepending nudges the rest of the internet, and `protect customers` routes business traffic first when links are congested, so home users take the hit instead of your SLAs. A new Optimize button drafts a script from live traffic and points out networks you could reach over an IX or a PNI instead of transit.
 - Twelve more Latin American cities: Montevideo, Asunción, Córdoba, La Paz, Quito, Medellín, Caracas, Guatemala City, San José, Querétaro, Monterrey and Guadalajara. Moviestar, Liberty Latte America, Antelope and Tiger Mobile join them, and Salvador and Montevideo get cable landings.
-- Seven new cables around Africa (ACE of Spades, SAT-3-Legged Stool, MainOne-Track Mind, Mint Tea West Africa, Set SAIL, Sea-Comedy Hour and Dare-Devil-1), and the existing ones now stop in the new cities. Set SAIL and SACS-y Cable link Brazil to Cameroon and Angola, and Sea-Comedy Hour links Djibouti to Mumbai. Liquid Lunch Networks, Sea-Comedy Networks, Angle-a Cables, Djibouti Calling, Empty-N, Air-Tell Africa, Ethio-Tele-Calm and Atlas Shrugged Telecom join the networks.
+- Seven new cables around Africa (ACE of Spades, SAT-3-Legged Stool, MainOne-Track Mind, Mint Tea West Africa, Set SAIL, Sea-Comedy Hour and Dare-Devil-1), and the existing ones now stop in the new cities. Set SAIL and SACS-y Cable link Brazil to Cameroon and Angola, and Sea-Comedy Hour links Djibouti to Mumbai. Liquid Lunch Networks, Sea-Comedy Networks, Angle-a Cables, Djibouti Calling, Empty-N, Air-Tell Africa, Ethio-Tele-Calm and Atlas Hold-the-Line Telecom join the networks.
 - Hamburg and Munich join the map, with the Moin-IX and the Brezn-IX. Stuttgart and Frankfurt are back where they belong on the map, with Stuttgart between Frankfurt and Zurich instead of halfway to Prague.
 - Swapping router models now sells the old ones on eBuy for 30% of their price, and removing a router does too (#82). A POP takes one swap a day, so a double click no longer buys two upgrades, and optics and waves now say which port speed they need instead of naming one model.
 - Fiber between nearby cities bends gently again instead of looping wide around the neighbourhood, so dense regions like Toronto, Ottawa and Montreal stay readable.

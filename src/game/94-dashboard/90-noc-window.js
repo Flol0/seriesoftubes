@@ -84,5 +84,5 @@ Object.assign(ACT,{
  // A second click finds the window that is already there. A blocked pop-up can only be told by its silence (noopener gives no handle).
  nocWindow:()=>{if(!S||pzOn()||!UI.slot)return;const id=UI.slot;if(NOC.peer){nocPost({t:'focus',id});return;}
    window.open(location.pathname+'?noc='+id,'_blank',(isPhone()||navigator.maxTouchPoints>0)?'noopener':'noopener,popup,width=1320,height=860');
-   if(!window.__TUBES_TEST__)setTimeout(()=>{if(!NOC.peer&&UI.slot===id)toast(tr('noc.your_browser_blocked_the_window'),'bad');},4000);},
+   if(!window.__TUBES_TEST__)setTimeout(()=>{if(!NOC.peer&&UI.slot===id)toast(tr('noc.your_browser_blocked_the_window'),'bad');},NOC_LOST);},
 });
