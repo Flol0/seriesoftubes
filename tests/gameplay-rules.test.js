@@ -104,7 +104,7 @@ const EXCEPTIONS = {
 // The real names the puns are based on. No network, cable, exchange, data center, router or optic may be called one.
 const REAL_NAMES = [
   // Tier 1s and carriers
-  'AT&T', 'Bell Aliant', 'BICS', 'Cogent', 'GTT', 'Hurricane Electric', 'Level 3', 'Level3', 'Liquid', 'Liquid Intelligent Technologies', 'Lumen', 'Northwestel', 'NTT', 'Orange', 'PCCW', 'SaskTel', 'Seacom', 'Singtel', 'Sparkle', 'Tata', 'Tata Communications', 'Telia', 'Telxius', 'Tusass', 'Vodafone', 'Zayo',
+  'AT&T', 'Bell Aliant', 'BICS', 'Cogent', 'GlobalConnect', 'GTT', 'Hurricane Electric', 'Level 3', 'Level3', 'Liquid', 'Liquid Intelligent Technologies', 'Lumen', 'Northwestel', 'NTT', 'Orange', 'PCCW', 'SaskTel', 'Seacom', 'Singtel', 'Sparkle', 'Tata', 'Tata Communications', 'Telia', 'Telxius', 'Tusass', 'Vodafone', 'Zayo',
   // content and clouds
   'Akamai', 'Alibaba Cloud', 'Amazon', 'Amazon Web Services', 'AWS', 'Baidu', 'ByteDance', 'Cloudflare', 'Facebook', 'Fastly', 'Google', 'Mercado Libre', 'Meta', 'Microsoft', 'Netflix', 'Tencent', 'TikTok', 'VK', 'VKontakte', 'Yandex',
   // eyeballs and incumbents
@@ -409,6 +409,31 @@ test('F5: rented capacity never outgrows the route\'s market (#203)', () => {
   g.ev("S.links.push({id:'f',a:'jed',b:'gdx',kind:'df',own:true,sys:'roadm',ch:[],km:9089,ready:0,day:0,cut:0,mo:1,trench:'own:f',pairs:1});compute();__reseed(5);ACT.listFiber({id:'f',w:120,p:1})");
   g.ev('for(let d=0;d<1500;d++){brTick();if(d%7===0)spawnOffer();}for(const o of S.offers.filter(o=>o.link===\'f\'))ACT.accept({id:o.id})');
   assert.ok(g.ev("brSold('jed','gdx')") <= g.ev("brMarket('jed','gdx')"), 'F5: no more than the route wants');
+  assert.deepEqual(g.errors, []);
+});
+
+test('F6: an alien wave is priced against its fiber, and a full route earns a few times its lease (#203)', () => {
+  const g = load();
+  g.ev("ACT.start({});if(UI.pendGame)ACT.pitchSkip();S.cash=1e9;S.lvl=6;S.biz=[];S.offers=[]");
+  for (const [a, b] of [['lon', 'par'], ['lon', 'nyc'], ['fra', 'sin'], ['nyc', 'sjc'], ['jed', 'gdx']]) {
+    const r = JSON.parse(g.ev(`(()=>{const l={id:'f6${a}${b}',a:'${a}',b:'${b}',kind:'df',own:true,sys:'cl',ch:[],km:Math.round(kmBetween('${a}','${b}')),ready:0,day:0,cut:0,mo:1,pairs:2};S.links.push(l);
+      const F=dfLeaseMo(l.km)+ampCount(l.km)*AMP_MO,M=brMarket(l.a,l.b),rs=[];
+      for(let i=0;i<M;i++){const r=wwRate(l,1);rs.push(r);S.biz.push({id:uid(),type:'wwave',link:l.id,slots:1,rate:r,city:l.a,city2:l.b,name:'n'+i,bw:1,mood:80,since:0,reqs:[]});}
+      return JSON.stringify({F,rs});})()`));
+    assert.ok(r.rs[0] <= 0.3 * r.F + 1, `F6: ${a}-${b} first wave ${r.rs[0]} vs fiber ${r.F}`);
+    for (let i = 1; i < r.rs.length; i++) assert.ok(r.rs[i] <= r.rs[i - 1], `F6: ${a}-${b} never dearer than the one before`);
+    const full = r.rs.reduce((x, y) => x + y, 0);
+    assert.ok(full < 8 * r.F, `F6: ${a}-${b} full route ${(full / r.F).toFixed(1)}× its lease`);
+  }
+  assert.deepEqual(g.errors, []);
+});
+
+test('F7: extra crews cut a build on land to half its planned time at most (#203)', () => {
+  const g = load();
+  g.ev("ACT.start({});if(UI.pendGame)ACT.pitchSkip();S.cash=1e11;S.lvl=4;for(const c of ['fra','mad'])if(!S.pops[c])ACT.buildPop({city:c})");
+  const km = Math.round(g.ev("kmBetween('fra','mad')")), days = g.ev(`dfBuildDays(${km})`), d0 = g.ev('S.day');
+  g.ev(`S.links.push({id:'f7',a:'fra',b:'mad',kind:'df',own:true,sys:'roadm',ch:[],km:${km},ready:S.day+${days},day:S.day,cut:0,mo:1,trench:'own:f7',pairs:1});ACT.crews({id:'f7',all:1});for(let i=0;i<50;i++)ACT.crews({id:'f7'})`);
+  assert.ok(g.ev("S.links.find(l=>l.id==='f7').ready") - d0 >= days / 2, 'F7: never under half the planned build');
   assert.deepEqual(g.errors, []);
 });
 
